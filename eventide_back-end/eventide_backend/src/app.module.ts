@@ -12,6 +12,7 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { CategoriesModule } from './categories/categories.module';
 import { UploadModule } from './upload/upload.module';
 import { SavedEventsModule } from './saved-events/saved-events.module';
+import { PromoCodesModule } from './promo-codes/promo-codes.module';
 import dbConfig from './config/dbConfig';
 
 
@@ -34,6 +35,7 @@ import dbConfig from './config/dbConfig';
     ReviewsModule, 
     CategoriesModule,
     SavedEventsModule,
+    PromoCodesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

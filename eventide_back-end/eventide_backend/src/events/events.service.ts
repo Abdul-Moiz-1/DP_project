@@ -10,6 +10,7 @@ import { User, UserRole } from '../entities/user.entity';
 import { CreateEventDto, UpdateEventDto, FindEventsDto, EventResponseDto } from './dto/event.dto';
 import { Booking } from 'src/entities/booking.entity';
 import { UploadService } from 'src/upload/upload.service';
+import { GeocodingService } from 'src/common/services/geocoding.service';
 
 @Injectable()
 export class EventsService {
@@ -22,6 +23,7 @@ export class EventsService {
     @InjectRepository(Category) private categoryRepo: Repository<Category>,
     @InjectRepository(User) private userRepo: Repository<User>,
     private readonly uploadService: UploadService,
+    private readonly geocodingService: GeocodingService,
   ) {}
 
   // async create(dto: CreateEventDto, userId: number): Promise<EventResponseDto> {
@@ -161,9 +163,18 @@ export class EventsService {
     }
 
     try {
-      const location = await this.locationRepo.save(this.locationRepo.create(dto.location));
+      const locationData = { ...dto.location };
+      if (!locationData.latitude || !locationData.longitude) {
+        const coords = await this.geocodingService.geocodeAddress(
+          locationData.address, locationData.city, locationData.country,
+        );
+        if (coords) {
+          locationData.latitude = coords.latitude;
+          locationData.longitude = coords.longitude;
+        }
+      }
+      const location = await this.locationRepo.save(this.locationRepo.create(locationData));
 
-      
       let categories: Category[] = [];
       if (dto.categoryIds && dto.categoryIds.length > 0) {
         categories = await this.categoryRepo.findBy({ id: In(dto.categoryIds) });
@@ -247,30 +258,62 @@ export class EventsService {
   //   };
   // }
   async findAll(dto: FindEventsDto) {
-    const { page = 1, limit = 10, search, city, categoryId, startDate, endDate } = dto;
-    
+    const {
+      page = 1, limit = 10, search, city, country, categoryId,
+      startDate, endDate, minPrice, maxPrice,
+      latitude, longitude, radius, sortBy,
+    } = dto;
+
     if (page < 1) throw new BadRequestException('Page must be greater than 0');
     if (limit < 1 || limit > 100) throw new BadRequestException('Limit must be between 1 and 100');
 
     const query = this.eventRepo.createQueryBuilder('event')
       .leftJoinAndSelect('event.organizer', 'organizer')
+      .leftJoinAndSelect('organizer.organizerProfile', 'organizerProfile')
       .leftJoinAndSelect('event.location', 'location')
       .leftJoinAndSelect('event.images', 'images')
       .leftJoinAndSelect('event.categories', 'categories')
-      .leftJoinAndSelect('event.tickets', 'tickets');
+      .leftJoinAndSelect('event.tickets', 'tickets')
+      .leftJoin('event.bookings', 'bookings');
 
     if (search) {
-      query.andWhere('(event.name ILIKE :search OR event.description ILIKE :search)', 
-        { search: `%${search}%` }
+      query.andWhere('(event.name ILIKE :search OR event.description ILIKE :search)',
+        { search: `%${search}%` },
       );
     }
     if (city) query.andWhere('location.city ILIKE :city', { city: `%${city}%` });
+    if (country) query.andWhere('location.country ILIKE :country', { country: `%${country}%` });
     if (categoryId) query.andWhere('categories.id = :categoryId', { categoryId });
     if (startDate) query.andWhere('event.startDate >= :startDate', { startDate: new Date(startDate) });
     if (endDate) query.andWhere('event.endDate <= :endDate', { endDate: new Date(endDate) });
 
+    if (minPrice !== undefined) {
+      query.andWhere('tickets.price >= :minPrice', { minPrice });
+    }
+    if (maxPrice !== undefined) {
+      query.andWhere('tickets.price <= :maxPrice', { maxPrice });
+    }
+
+    if (latitude && longitude && radius) {
+      const radiusKm = radius;
+      query.andWhere(
+        `(6371 * acos(cos(radians(:lat)) * cos(radians(location.latitude)) * cos(radians(location.longitude) - radians(:lng)) + sin(radians(:lat)) * sin(radians(location.latitude)))) <= :radius`,
+        { lat: latitude, lng: longitude, radius: radiusKm },
+      );
+    }
+
+    if (sortBy === 'price') {
+      query.orderBy('tickets.price', 'ASC');
+    } else if (sortBy === 'distance' && latitude && longitude) {
+      query.orderBy(
+        `(6371 * acos(cos(radians(${latitude})) * cos(radians(location.latitude)) * cos(radians(location.longitude) - radians(${longitude})) + sin(radians(${latitude})) * sin(radians(location.latitude))))`,
+        'ASC',
+      );
+    } else {
+      query.orderBy('event.startDate', 'ASC');
+    }
+
     const [items, total] = await query
-      .orderBy('event.startDate', 'ASC')
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();
@@ -551,6 +594,82 @@ export class EventsService {
     };
   }
 
+  async getRecommended(userId: number, limit: number = 10): Promise<EventResponseDto[]> {
+    const bookings = await this.bookingRepo.find({
+      where: { user: { id: userId } },
+      relations: ['event', 'event.categories'],
+    });
+
+    const categoryIds = new Set<number>();
+    bookings.forEach(b => {
+      b.event?.categories?.forEach(c => categoryIds.add(c.id));
+    });
+
+    const bookedEventIds = new Set(bookings.map(b => b.event?.id).filter(Boolean));
+
+    let query = this.eventRepo.createQueryBuilder('event')
+      .leftJoinAndSelect('event.organizer', 'organizer')
+      .leftJoinAndSelect('organizer.organizerProfile', 'organizerProfile')
+      .leftJoinAndSelect('event.location', 'location')
+      .leftJoinAndSelect('event.images', 'images')
+      .leftJoinAndSelect('event.categories', 'categories')
+      .leftJoinAndSelect('event.tickets', 'tickets')
+      .where('event.startDate > :now', { now: new Date() });
+
+    if (bookedEventIds.size > 0) {
+      query.andWhere('event.id NOT IN (:...bookedIds)', { bookedIds: Array.from(bookedEventIds) });
+    }
+
+    if (categoryIds.size > 0) {
+      query.andWhere('categories.id IN (:...catIds)', { catIds: Array.from(categoryIds) });
+    }
+
+    const events = await query
+      .orderBy('event.startDate', 'ASC')
+      .take(limit)
+      .getMany();
+
+    if (events.length < limit) {
+      const existingIds = events.map(e => e.id);
+      const allExcluded = [...existingIds, ...Array.from(bookedEventIds)];
+      const filler = await this.eventRepo.createQueryBuilder('event')
+        .leftJoinAndSelect('event.organizer', 'organizer')
+        .leftJoinAndSelect('organizer.organizerProfile', 'organizerProfile')
+        .leftJoinAndSelect('event.location', 'location')
+        .leftJoinAndSelect('event.images', 'images')
+        .leftJoinAndSelect('event.categories', 'categories')
+        .leftJoinAndSelect('event.tickets', 'tickets')
+        .where('event.startDate > :now', { now: new Date() })
+        .andWhere(allExcluded.length > 0 ? 'event.id NOT IN (:...excludedIds)' : '1=1',
+          allExcluded.length > 0 ? { excludedIds: allExcluded } : {},
+        )
+        .orderBy('event.startDate', 'ASC')
+        .take(limit - events.length)
+        .getMany();
+      events.push(...filler);
+    }
+
+    return events.map(e => this.toResponse(e));
+  }
+
+  async updateStatus(id: number, status: string, userId: number): Promise<EventResponseDto> {
+    const validStatuses = ['DRAFT', 'PUBLISHED', 'CANCELLED', 'COMPLETED'];
+    if (!validStatuses.includes(status)) {
+      throw new BadRequestException(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+    }
+
+    const event = await this.eventRepo.findOne({
+      where: { id },
+      relations: ['organizer'],
+    });
+    if (!event) throw new NotFoundException('Event not found');
+    if (event.organizer.id !== userId) throw new ForbiddenException('Access denied');
+
+    event.status = status as any;
+    await this.eventRepo.save(event);
+    return this.findOne(id);
+  }
+
   private getEventStatus(event: Event): string {
     const now = new Date();
     if (now < event.startDate) return 'UPCOMING';
@@ -558,12 +677,12 @@ export class EventsService {
     return 'PAST';
   }
 
-
   private toResponse(event: Event): EventResponseDto {
     return {
       id: event.id,
       name: event.name,
       description: event.description,
+      status: event.status || this.getEventStatus(event),
       startDate: event.startDate,
       endDate: event.endDate,
       capacity: event.capacity,

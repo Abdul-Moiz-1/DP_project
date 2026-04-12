@@ -11,8 +11,9 @@ import { Event } from './event.entity';
 import bcrypt from 'bcrypt'
 
 export enum UserRole {
-  ATTENDEE = 'ATTENDEE',
+  USER = 'USER',
   ORGANIZER = 'ORGANIZER',
+  ADMIN = 'ADMIN',
 }
 
 @Entity()
@@ -37,7 +38,7 @@ export class User {
   @Column({
     type: 'enum',
     enum: UserRole,
-    default: UserRole.ATTENDEE
+    default: UserRole.USER
   })
   @IsEnum(UserRole)
   role: UserRole

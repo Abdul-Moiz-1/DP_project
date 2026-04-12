@@ -142,7 +142,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const logout = async () => {
     try {
-      const res = await api.post('auth/logout');
+      const res = await api.post('/auth/logout');
 
       if (!res) {
         throw new Error(`no response from logout API`);

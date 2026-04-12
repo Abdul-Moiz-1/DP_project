@@ -31,19 +31,22 @@ const Footer: React.FC = () => {
               Site Map
             </h3>
             <ul className="space-y-2 text-sm">
-              {["Home", "Events", "Organizers", "About", "Contact"].map(
-                (item) => (
-                  <li key={item}>
+              {[
+                { label: "Home", href: "/" },
+                { label: "Events", href: "/events" },
+                { label: "About", href: "/about" },
+                { label: "Contact", href: "/contact" },
+              ].map((item) => (
+                  <li key={item.label}>
                     <Link
-                      href={`/${item.toLowerCase()}`}
+                      href={item.href}
                       color="foreground"
                       className="hover:text-primary"
                     >
-                      {item}
+                      {item.label}
                     </Link>
                   </li>
-                )
-              )}
+                ))}
             </ul>
           </div>
 
@@ -72,9 +75,9 @@ const Footer: React.FC = () => {
 
         {/* Bottom Bar */}
         <div className="flex flex-col md:flex-row justify-between items-center text-xs text-default-500 gap-2">
-          <p>© {year} SiteSeeker. All rights reserved.</p>
+          <p>© {year} Eventide. All rights reserved.</p>
           <p className="text-default-400">
-            Designed with ❤️ using HeroUI & Next.js
+            Designed with care using HeroUI & React
           </p>
         </div>
       </Card>

@@ -13,6 +13,13 @@ import { Category } from './category.entity';
 import { Booking } from './booking.entity';
 import { Review } from './review.entity';
 
+export enum EventStatus {
+  DRAFT = 'DRAFT',
+  PUBLISHED = 'PUBLISHED',
+  CANCELLED = 'CANCELLED',
+  COMPLETED = 'COMPLETED',
+}
+
 @Entity()
 export class Event {
   @PrimaryGeneratedColumn()
@@ -26,6 +33,13 @@ export class Event {
   @Column({ type: 'text' })
   @IsNotEmpty()
   description: string;
+
+  @Column({
+    type: 'enum',
+    enum: EventStatus,
+    default: EventStatus.PUBLISHED,
+  })
+  status: EventStatus;
 
   @Column({ type: 'timestamp' })
   @IsDateString()

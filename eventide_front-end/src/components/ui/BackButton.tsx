@@ -18,6 +18,7 @@ export default function BackButton({ onClick, className }: BackButtonProps) {
       isIconOnly
       variant="bordered"
       className={className}
+      aria-label="Go back"
       onPress={() => (onClick ? onClick() : navigate(-1))}
     >
       ←

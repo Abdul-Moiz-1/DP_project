@@ -75,9 +75,9 @@ const Register = () => {
     if (step === 3) {
       if (createNewOrg) {
         if (!formData.organizationName.trim()) newErrors.organizationName = 'Organization name required';
-        if (!formData.address) newErrors.businessEmail = 'address is required';
-        if (!formData.city) newErrors.registrationNumber = 'City is required';
-        if (!formData.state) newErrors.taxId = 'State is required';
+        if (!formData.address) newErrors.address = 'Address is required';
+        if (!formData.city) newErrors.city = 'City is required';
+        if (!formData.state) newErrors.state = 'State is required';
         if (!formData.country) newErrors.country = 'Country is required';
         if (!formData.zipCode) newErrors.zipCode = 'Zip Code is required';
       }
@@ -102,21 +102,20 @@ const Register = () => {
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
+      const isOrganizer = formData.role === UserRole.ORGANIZER && createNewOrg;
       await register({
         name: formData.name,
         email: formData.email,
         password: formData.password,
-        organizerProfile: {
-          organizationName: createNewOrg ? formData.organizationName : undefined,
-          address: createNewOrg ? formData.address: '',
-          city: createNewOrg ? formData.city: '',
-          state:    createNewOrg ? formData.state: '',
-          country:  createNewOrg ? formData.country: '',
-          zipCode:  createNewOrg ? formData.zipCode: '',
-
-        }
+        organizerProfile: isOrganizer ? {
+          organizationName: formData.organizationName,
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          country: formData.country,
+          zipCode: formData.zipCode,
+        } : undefined,
       });
-      console.log(`Data from the form : ${JSON.stringify(formData)}`)
     } catch (error) {
       setErrors({ submit: 'Registration failed' });
     } finally {
@@ -129,7 +128,7 @@ const Register = () => {
       <div className="w-full max-w-2xl">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-display font-bold gradient-text mb-2">
-            Join EventHub
+            Join Eventide
           </h1>
           <p className="text-default-500">Create your account and start exploring events</p>
         </div>

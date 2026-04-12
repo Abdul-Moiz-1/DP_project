@@ -39,11 +39,11 @@ export class UsersService {
 
     async create(createUserDto: CreateUserDto): Promise<UserResponseDto> {
     try {
-        const { password, organizerProfile, ...userDto } = createUserDto;
+        const { password, organizerProfile: rawOrgProfile, ...userDto } = createUserDto;
         const hashedPassword = await bcrypt.hash(password, 10);
         
-        // Set initial role based on whether organizerProfile is provided
-        const initialRole = organizerProfile ? UserRole.ORGANIZER : UserRole.ATTENDEE;
+        const organizerProfile = rawOrgProfile?.organizationName ? rawOrgProfile : undefined;
+        const initialRole = organizerProfile ? UserRole.ORGANIZER : UserRole.USER;
         
         // Create user with appropriate role
         const user = this.userRepository.create({ 

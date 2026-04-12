@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToOne } from 'typeorm';
-import { IsNotEmpty, IsString, IsOptional, IsUrl } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsUrl, IsNumber } from 'class-validator';
 import { Event } from './event.entity';
 
 @Entity()
@@ -31,6 +31,16 @@ export class EventLocation {
   @IsNotEmpty()
   @IsString()
   postalCode: string;
+
+  @Column({ type: 'float', nullable: true })
+  @IsOptional()
+  @IsNumber()
+  latitude?: number;
+
+  @Column({ type: 'float', nullable: true })
+  @IsOptional()
+  @IsNumber()
+  longitude?: number;
 
   @Column({ nullable: true })
   @IsOptional()

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { TicketsService } from './tickets.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
@@ -11,8 +11,8 @@ export class TicketsController {
   constructor(private readonly ticketsService: TicketsService) {}
 
   @Post()
-  create(@Body() createTicketDto: CreateTicketDto) {
-    return this.ticketsService.create(createTicketDto);
+  create(@Body() dto: CreateTicketDto, @GetUser('userId') userId: number) {
+    return this.ticketsService.create(dto, userId);
   }
 
   @Get()
@@ -20,23 +20,32 @@ export class TicketsController {
     return this.ticketsService.findAll();
   }
 
+  @Get('my-tickets')
+  getUserTickets(@GetUser('userId') userId: number) {
+    return this.ticketsService.getUserTickets(userId);
+  }
+
+  @Get('event/:eventId')
+  getEventTickets(@Param('eventId', ParseIntPipe) eventId: number) {
+    return this.ticketsService.getEventTickets(eventId);
+  }
+
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.ticketsService.findOne(+id);
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.ticketsService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateTicketDto: UpdateTicketDto) {
-    return this.ticketsService.update(+id, updateTicketDto);
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateTicketDto,
+    @GetUser('userId') userId: number,
+  ) {
+    return this.ticketsService.update(id, dto, userId);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.ticketsService.remove(+id);
-  }
-
-  @Get('my-tickets')
-  getUserTickets(@GetUser() userId: number){
-    return this.ticketsService.getUserTickets(userId);
+  remove(@Param('id', ParseIntPipe) id: number, @GetUser('userId') userId: number) {
+    return this.ticketsService.remove(id, userId);
   }
 }

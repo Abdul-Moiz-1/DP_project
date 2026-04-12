@@ -2,7 +2,7 @@ import { FC, useState, useEffect } from "react";
 import { VisuallyHidden } from "@react-aria/visually-hidden";
 import { SwitchProps, useSwitch } from "@heroui/react";
 import clsx from "clsx";
-import { useTheme } from "@heroui/react";
+import {useTheme} from "@heroui/use-theme";
 
 import { SunFilledIcon, MoonFilledIcon } from "@/components/Icons";
 
@@ -72,9 +72,9 @@ export const ThemeSwitch: FC<ThemeSwitchProps> = ({
         })}
       >
         {isSelected ? (
-          <MoonFilledIcon size={22} />
-        ) : (
           <SunFilledIcon size={22} />
+        ) : (
+          <MoonFilledIcon size={22} />
         )}
       </div>
     </Component>

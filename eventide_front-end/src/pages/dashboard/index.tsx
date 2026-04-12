@@ -123,7 +123,7 @@ export default function DashboardPage() {
       </div>
     );
 
-  if (user?.role === "ATTENDEE") {
+  if (user?.role === "USER") {
     return <AttendeeDashboardWrapper />;
   }
 

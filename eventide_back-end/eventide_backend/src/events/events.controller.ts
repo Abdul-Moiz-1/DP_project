@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -11,6 +12,7 @@ import {
   ParseIntPipe,
   UseInterceptors,
   UploadedFiles,
+  BadRequestException,
 } from '@nestjs/common';
 import { EventsService } from './events.service';
 import {
@@ -26,10 +28,14 @@ import { UserRole } from '../entities/user.entity';
 import { GetUser } from '../common/decorators/get-user.decorator';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { FilesValidationPipe } from 'src/common/pipes/multiple-files-validation.pipe';
+import { DirectionsService } from 'src/common/services/directions.service';
 
 @Controller('events')
 export class EventsController {
-  constructor(private readonly eventsService: EventsService) {}
+  constructor(
+    private readonly eventsService: EventsService,
+    private readonly directionsService: DirectionsService,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -60,6 +66,12 @@ export class EventsController {
     return this.eventsService.findAll(dto);
   }
 
+  @Get('recommended')
+  @UseGuards(JwtAuthGuard)
+  getRecommended(@GetUser('userId') userId: number) {
+    return this.eventsService.getRecommended(userId);
+  }
+
   @Get('my-events')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Role(UserRole.ORGANIZER)
@@ -85,6 +97,28 @@ export class EventsController {
     return this.eventsService.getEventAnalytics(id, userId);
   }
 
+  @Get(':id/directions')
+  async getDirections(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('fromLat') fromLat: number,
+    @Query('fromLng') fromLng: number,
+  ) {
+    if (!fromLat || !fromLng) {
+      throw new BadRequestException('fromLat and fromLng are required');
+    }
+    const event = await this.eventsService.findOne(id);
+    const toLat = event.location?.latitude;
+    const toLng = event.location?.longitude;
+    if (!toLat || !toLng) {
+      throw new BadRequestException('Event location coordinates not available');
+    }
+    const route = await this.directionsService.getDirections(fromLat, fromLng, toLat, toLng);
+    if (!route) {
+      throw new BadRequestException('Unable to calculate directions');
+    }
+    return route;
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number): Promise<EventResponseDto> {
     return this.eventsService.findOne(id);
@@ -99,6 +133,17 @@ export class EventsController {
     @GetUser('userId') userId: number,
   ): Promise<EventResponseDto> {
     return this.eventsService.update(id, dto, userId);
+  }
+
+  @Patch(':id/status')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Role(UserRole.ORGANIZER)
+  updateStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('status') status: string,
+    @GetUser('userId') userId: number,
+  ) {
+    return this.eventsService.updateStatus(id, status, userId);
   }
 
   @Delete(':id')

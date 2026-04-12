@@ -97,7 +97,7 @@ const Login = () => {
             Welcome Back
           </h1>
           <p className="text-default-500">
-            Sign in to continue to EventHub
+            Sign in to continue to Eventide
           </p>
         </div>
 
@@ -151,8 +151,9 @@ const Login = () => {
                 size="lg"
                 endContent={
                   <button
-                    className="focus:outline-none"
+                    className="focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
                     type="button"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? (

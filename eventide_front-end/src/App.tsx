@@ -22,6 +22,7 @@ import SavedEventsPage from "./pages/dashboard/SavedEventsPage";
 import SettingsPage from "./pages/dashboard/SettingsPage";
 import ReviewsPage from "./pages/dashboard/ReviewsPage";
 import EventAnalyticsPage from "./pages/dashboard/EventAnalyticsPage";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 function App() {
   return (
@@ -39,8 +40,8 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
-        {/* Dashboard Routes */}
-        <Route path="/dashboard" element={<DashboardLayout />}>
+        {/* Dashboard Routes - Protected */}
+        <Route path="/dashboard" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
           <Route index element={<DashboardHome />} />
           <Route path="events" element={<DashboardEvents />} />
           <Route path="events/create" element={<CreateEventPage />} />

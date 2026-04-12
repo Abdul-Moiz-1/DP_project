@@ -8,6 +8,8 @@ export class LocationDto {
   @IsString() @IsNotEmpty() state: string;
   @IsString() @IsNotEmpty() country: string;
   @IsString() @IsNotEmpty() postalCode: string;
+  @IsOptional() @IsNumber() latitude?: number;
+  @IsOptional() @IsNumber() longitude?: number;
   @IsOptional() @IsString() googleMapsLink?: string;
 }
 
@@ -55,9 +57,16 @@ export class FindEventsDto {
   @IsOptional() @Type(() => Number) limit?: number = 10;
   @IsOptional() @IsString() search?: string;
   @IsOptional() @IsString() city?: string;
+  @IsOptional() @IsString() country?: string;
   @IsOptional() @Type(() => Number) categoryId?: number;
   @IsOptional() @IsDateString() startDate?: string;
   @IsOptional() @IsDateString() endDate?: string;
+  @IsOptional() @Type(() => Number) minPrice?: number;
+  @IsOptional() @Type(() => Number) maxPrice?: number;
+  @IsOptional() @Type(() => Number) latitude?: number;
+  @IsOptional() @Type(() => Number) longitude?: number;
+  @IsOptional() @Type(() => Number) radius?: number;
+  @IsOptional() @IsString() sortBy?: 'date' | 'price' | 'distance';
 }
 
 // Response
@@ -65,6 +74,7 @@ export class EventResponseDto {
   id: number;
   name: string;
   description: string;
+  status?: string;
   startDate: Date;
   endDate: Date;
   capacity: number;

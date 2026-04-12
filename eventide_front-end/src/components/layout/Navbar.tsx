@@ -132,7 +132,7 @@ const Navbar = () => {
                 <DropdownItem key="dashboard" onClick={() => navigate('/dashboard')}>
                   Dashboard
                 </DropdownItem>
-                <DropdownItem key="my-tickets" onClick={() => navigate('dashboard/my-tickets')}>
+                <DropdownItem key="my-tickets" onClick={() => navigate('/dashboard/my-tickets')}>
                   My Tickets
                 </DropdownItem>
                 {/* <DropdownItem key="settings" onClick={() => navigate('/settings')}>

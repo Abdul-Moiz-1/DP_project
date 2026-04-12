@@ -63,21 +63,21 @@ async function seed() {
     name: 'John Doe',
     email: 'john@example.com',
     password,
-    role: UserRole.ATTENDEE,
+    role: UserRole.USER,
   });
 
   const attendee2 = await userRepo.save({
     name: 'Jane Smith',
     email: 'jane@example.com',
     password,
-    role: UserRole.ATTENDEE,
+    role: UserRole.USER,
   });
 
   const attendee3 = await userRepo.save({
     name: 'Mike Johnson',
     email: 'mike@example.com',
     password,
-    role: UserRole.ATTENDEE,
+    role: UserRole.USER,
   });
 
   const organizer1 = await userRepo.save({

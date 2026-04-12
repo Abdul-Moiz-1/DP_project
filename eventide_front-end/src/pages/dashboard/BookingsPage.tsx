@@ -234,7 +234,7 @@ export default function BookingsPage() {
               ) : (
                 <Table aria-label="Event bookings table" removeWrapper>
                   <TableHeader>
-                    <TableColumn>ATTENDEE</TableColumn>
+                    <TableColumn>USER</TableColumn>
                     <TableColumn>EMAIL</TableColumn>
                     <TableColumn>TICKET TYPE</TableColumn>
                     <TableColumn>PRICE</TableColumn>

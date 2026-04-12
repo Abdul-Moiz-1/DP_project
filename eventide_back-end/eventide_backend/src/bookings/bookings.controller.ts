@@ -28,30 +28,26 @@ export class BookingsController {
     return this.bookingsService.getAttendeeStats(userId);
   }
 
-
+  @UseGuards(RolesGuard)
+  @Role(UserRole.ORGANIZER)
+  @Get('event/:eventId')
+  getEventBookings(@Param('eventId', ParseIntPipe) eventId: number, @GetUser('userId') userId: number) {
+    return this.bookingsService.getEventBookings(eventId, userId);
+  }
 
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number, @GetUser('userId') userId: number): Promise<BookingResponseDto> {
     return this.bookingsService.findOne(id, userId);
   }
 
-
   @Patch(':id')
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateBookingDto, @GetUser('userId') userId: number): Promise<BookingResponseDto> {
     return this.bookingsService.update(id, dto, userId);
   }
 
-
   @Delete(':id')
   cancel(@Param('id', ParseIntPipe) id: number, @GetUser('userId') userId: number): Promise<void> {
     return this.bookingsService.cancel(id, userId);
-  }
-
-  @UseGuards(RolesGuard)
-  @Role(UserRole.ORGANIZER)
-  @Get('event/:eventId')
-  getEventBookings(@Param('eventId', ParseIntPipe) eventId: number, @GetUser('userId') userId: number) {
-    return this.bookingsService.getEventBookings(eventId, userId);
   }
 
 

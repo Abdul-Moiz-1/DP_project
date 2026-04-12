@@ -9,9 +9,9 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { User } from '../entities/user.entity';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { UsersService } from 'src/users/users.service';
 import { OrganizerProfile } from 'src/entities/organizer-profile.entity';
 import { UsersModule } from 'src/users/users.module';
+import { EmailService } from 'src/common/services/email.service';
 
 @Module({
   imports: [
@@ -28,7 +28,7 @@ import { UsersModule } from 'src/users/users.module';
       }),
     }),
   ],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, EmailService],
   controllers: [AuthController],
 })
 export class AuthModule {}

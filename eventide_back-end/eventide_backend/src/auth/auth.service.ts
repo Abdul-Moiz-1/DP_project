@@ -13,6 +13,7 @@ import { User, UserRole } from '../entities/user.entity';
 import { RegisterDto } from './dto/register.dto';
 import { UsersService } from 'src/users/users.service';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
+import { EmailService } from 'src/common/services/email.service';
 
 @Injectable()
 export class AuthService {
@@ -20,6 +21,7 @@ export class AuthService {
         private usersService: UsersService,
         private jwtService: JwtService,
         private config: ConfigService,
+        private emailService: EmailService,
     ) { }
 
 
@@ -50,17 +52,17 @@ async register(createUserDto: CreateUserDto) {
     const exists = await this.usersService.findByEmail(createUserDto?.email);
     if (exists) throw new ForbiddenException('Email already used');
     
-    // Create base user first
     const user = await this.usersService.create(createUserDto);
-    
-    // If organizer profile data is provided, upgrade the user    
+
+    this.emailService.sendWelcomeEmail(user.email, user.name).catch(() => {});
+
     return { user };
 }
     // for using local strategy
     async validateLocalUser(email: string, password: string) {
         const user = await this.usersService.findByEmail(email);
         if (!user) throw new UnauthorizedException('User not found!');
-        const isPasswordMatched = this.compare(user.password, password);
+        const isPasswordMatched = await this.compare(password, user.password);
         if (!isPasswordMatched)
             throw new UnauthorizedException('Invalid Credentials!');
 

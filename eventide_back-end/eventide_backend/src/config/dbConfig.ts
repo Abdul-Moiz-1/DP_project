@@ -9,10 +9,12 @@ import { Review } from 'src/entities/review.entity';
 import { Ticket } from 'src/entities/ticket.entity';
 import { SavedEvent } from 'src/entities/saved-event.entity';
 import { User } from 'src/entities/user.entity';
+import { UserPreference } from 'src/entities/user-preference.entity';
+import { Follow } from 'src/entities/follow.entity';
+import { PromoCode } from 'src/entities/promo-code.entity';
 import { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConnectionOptions.js';
 
 export default (): PostgresConnectionOptions => ({
-  // TODO: access the url from the .env file after configuring the env later
   url: process.env.DATABASE_URL,
   type: 'postgres',
   port: 5432,
@@ -27,6 +29,9 @@ export default (): PostgresConnectionOptions => ({
     Category,
     Booking,
     SavedEvent,
+    UserPreference,
+    Follow,
+    PromoCode,
   ],
   synchronize: true, // this is only for development env (set to false for production)
   ssl: {
