@@ -20,10 +20,16 @@ export class BookingsService {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
-    const event = await this.eventRepo.findOne({ where: { id: dto.eventId } });
+    const event = await this.eventRepo.findOne({
+      where: { id: dto.eventId },
+      relations: ['organizer', 'location', 'images'],
+    });
     if (!event) throw new NotFoundException('Event not found');
 
-    const ticket = await this.ticketRepo.findOne({ where: { id: dto.ticketId } });
+    const ticket = await this.ticketRepo.findOne({
+      where: { id: dto.ticketId, event: { id: dto.eventId } },
+      relations: ['event'],
+    });
     if (!ticket) throw new NotFoundException('Ticket not found');
     
     // Check if event has already ended
@@ -38,7 +44,11 @@ export class BookingsService {
       throw new BadRequestException('Ticket sales have already ended')
     }
 
-    if (event.bookings.length === event.capacity){
+    const confirmedBookings = await this.bookingRepo.count({
+      where: { event: { id: event.id }, status: 'CONFIRMED' },
+    });
+
+    if (confirmedBookings >= event.capacity) {
       throw new ForbiddenException('Event Bookings are full')
     }
     // Optional: check if event booking period has started

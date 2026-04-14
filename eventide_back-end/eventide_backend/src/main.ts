@@ -39,8 +39,8 @@ async function runEnumMigrations() {
     if (eventEnumExists.length === 0) {
       console.log('[Migration] event_status_enum will be created by TypeORM synchronize');
     }
-  } catch (err) {
-    console.warn('[Migration] Pre-startup migration warning:', err.message);
+  } catch (err: any) {
+    console.warn('[Migration] Pre-startup migration warning:', err?.message);
   } finally {
     if (ds.isInitialized) await ds.destroy();
   }
@@ -50,19 +50,20 @@ async function bootstrap() {
   await runEnumMigrations();
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // app.useStaticAssets(join(__dirname, '..', 'uploads'));
+  const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 
-
- 
   app.enableCors({
-    origin: 'http://localhost:5173', // your frontend URL
-    credentials: true, // needed for cookies
+    origin: corsOrigins,
+    credentials: true,
   });
-   app.use(cookieParser());
+  app.use(cookieParser());
 
-   // Serve static assets
+  // Serve static assets
   app.useStaticAssets(join(process.cwd(), 'uploads'), {
-  prefix: "/uploads/", // for global directory like /backend/aladin/uploads
+    prefix: "/uploads/",
   });
 
   console.log('Serving uploads from:', join(process.cwd(), 'uploads'));
@@ -89,9 +90,9 @@ async function bootstrap() {
       transformOptions: { enableImplicitConversion: true },
     }),
   );
-  await app.listen(3000);
-  // console.log(process.env.DATABASE_URL);
-  console.log(`Server running on localhost:3000`)
-  console.log("Swagger docs available at localhost:3000/api")
+  const port = parseInt(process.env.APP_PORT || '3000', 10);
+  await app.listen(port);
+  console.log(`Server running on localhost:${port}`)
+  console.log(`Swagger docs available at localhost:${port}/api`)
 }
 bootstrap();

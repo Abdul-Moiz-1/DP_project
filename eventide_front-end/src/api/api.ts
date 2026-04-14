@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// // ==================== API Configuration ====================
-export const API_BASE_URL = 'http://localhost:3000';
+// ==================== API Configuration ====================
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -10,8 +10,6 @@ export const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken');
-  // console.log("access token fetched from local storage", token)
-  console.log(api.interceptors.request)
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }

@@ -8,6 +8,7 @@ import type { CreateEventDto, EventResponseDto, UpdateEventDto } from "@/lib/dto
 import { useToast } from "@/components/toast-provider"
 import { useNavigate } from "react-router-dom"
 import { api } from "@/api/api"
+import { InteractiveLocationPicker } from "@/components/common/InteractiveLocationPicker"
 
 interface EventFormProps {
   onSubmit: (data: CreateEventDto | UpdateEventDto) => Promise<void>
@@ -20,6 +21,17 @@ interface CategoryOption {
   name: string
 }
 
+interface PlaceSuggestion {
+  displayName: string
+  latitude: number
+  longitude: number
+  address: string
+  city: string
+  state: string
+  country: string
+  postalCode: string
+}
+
 const STEPS = [
   { key: "details", label: "Event Details", icon: Calendar },
   { key: "location", label: "Location", icon: MapPin },
@@ -27,28 +39,60 @@ const STEPS = [
   { key: "media", label: "Media & Review", icon: ImageIcon },
 ]
 
+interface FormValues extends Omit<CreateEventDto, 'startDate' | 'endDate' | 'tickets'> {
+  startDate: string;
+  endDate: string;
+  tickets: {
+    name: string;
+    price: number;
+    salesStartDate: string;
+    salesEndDate: string;
+  }[];
+}
+
 export function EventForm({ onSubmit, initialData, isLoading = false }: EventFormProps) {
   const { success, error } = useToast()
   const navigate = useNavigate()
   const [currentStep, setCurrentStep] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [categories, setCategories] = useState<CategoryOption[]>([])
-  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>(
-    initialData?.categories?.map((c) => c.id) || []
-  )
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([])
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
-  const [previewUrls, setPreviewUrls] = useState<string[]>(
-    initialData?.images?.map((img) => img.imageUrl) || []
-  )
+  const [previewUrls, setPreviewUrls] = useState<string[]>([])
+  const [placeSuggestions, setPlaceSuggestions] = useState<PlaceSuggestion[]>([])
+  const [placesLoading, setPlacesLoading] = useState(false)
+  const [placesError, setPlacesError] = useState("")
+  const [ticketUpdateDisabled, setTicketUpdateDisabled] = useState(false)
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set())
+
+  // Helper to format ISO strings for datetime-local input (YYYY-MM-DDTHH:mm)
+  const formatDateForInput = (dateStr: string | Date | undefined) => {
+    if (!dateStr) return ""
+    try {
+      const date = new Date(dateStr)
+      if (isNaN(date.getTime())) return ""
+      const pad = (n: number) => n.toString().padStart(2, '0')
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+    } catch {
+      return ""
+    }
+  }
+
+  const parseNumber = (value: string, fallback = 0) => {
+    const parsed = parseFloat(value)
+    return isNaN(parsed) ? fallback : parsed
+  }
 
   const {
     control,
     handleSubmit,
+    setValue,
     watch,
     trigger,
+    reset,
     formState: { errors },
-  } = useForm<CreateEventDto | UpdateEventDto | EventResponseDto>({
-    defaultValues: initialData || {
+  } = useForm<FormValues>({
+    defaultValues: {
       name: "",
       description: "",
       startDate: "",
@@ -60,6 +104,44 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
       categoryIds: [],
     },
   })
+
+  useEffect(() => {
+    if (initialData) {
+      // Check if event has confirmed bookings - if so, disable ticket updates
+      if (initialData.bookings && initialData.bookings > 0) {
+        setTicketUpdateDisabled(true)
+      }
+
+      const formattedData: FormValues = {
+        name: initialData.name || "",
+        description: initialData.description || "",
+        startDate: formatDateForInput(initialData.startDate),
+        endDate: formatDateForInput(initialData.endDate),
+        capacity: initialData.capacity || 0,
+        location: {
+          address: initialData.location?.address || "",
+          city: initialData.location?.city || "",
+          state: initialData.location?.state || "",
+          country: initialData.location?.country || "",
+          postalCode: initialData.location?.postalCode || "",
+          latitude: initialData.location?.latitude,
+          longitude: initialData.location?.longitude,
+          googleMapsLink: initialData.location?.googleMapsLink || "",
+        },
+        tickets: (initialData.tickets || []).map((t) => ({
+          name: t.name || "",
+          price: Number(t.price) || 0,
+          salesStartDate: formatDateForInput(t.salesStartDate),
+          salesEndDate: formatDateForInput(t.salesEndDate),
+        })),
+        categoryIds: initialData.categories?.map((c) => c.id) || [],
+        imageUrls: initialData.images?.map((img) => img.imageUrl) || [],
+      }
+      reset(formattedData)
+      setSelectedCategoryIds(formattedData.categoryIds || [])
+      setPreviewUrls(formattedData.imageUrls || [])
+    }
+  }, [initialData, reset])
 
   const {
     fields: ticketFields,
@@ -80,10 +162,15 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
     3: [],
   }
 
+  const validateStep = async (stepIndex: number): Promise<boolean> => {
+    const fields = stepFields[stepIndex] as any[]
+    return fields.length > 0 ? await trigger(fields) : true
+  }
+
   const goNext = async () => {
-    const fields = stepFields[currentStep] as any[]
-    const valid = fields.length > 0 ? await trigger(fields) : true
-    if (valid && currentStep < STEPS.length - 1) {
+    const isValid = await validateStep(currentStep)
+    if (isValid && currentStep < STEPS.length - 1) {
+      setCompletedSteps(prev => new Set([...prev, currentStep]))
       setCurrentStep((s) => s + 1)
     }
   }
@@ -92,73 +179,254 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
     if (currentStep > 0) setCurrentStep((s) => s - 1)
   }
 
+  const goToStep = async (stepIndex: number) => {
+    if (stepIndex < currentStep) {
+      setCurrentStep(stepIndex)
+      return
+    }
+    if (stepIndex > currentStep) {
+      for (let i = currentStep; i < stepIndex; i++) {
+        const isValid = await validateStep(i)
+        if (!isValid) return
+      }
+      setCompletedSteps(prev => {
+        const updated = new Set(prev)
+        for (let i = currentStep; i < stepIndex; i++) {
+          updated.add(i)
+        }
+        return updated
+      })
+      setCurrentStep(stepIndex)
+    }
+  }
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
-    const newFiles = [...uploadedFiles, ...files].slice(0, 5)
-    setUploadedFiles(newFiles)
-    const urls = newFiles.map((f) => URL.createObjectURL(f))
-    setPreviewUrls(urls)
+    if (files.length === 0) return
+    
+    // Check total images won't exceed 5
+    const newTotal = uploadedFiles.length + files.length
+    if (newTotal > 5) {
+      error(`Maximum 5 images allowed. You can upload ${5 - uploadedFiles.length} more.`)
+      return
+    }
+    
+    // Add new files
+    setUploadedFiles(prev => [...prev, ...files])
+    
+    // Create preview URLs for new files only
+    const newUrls = files.map((f) => URL.createObjectURL(f))
+    setPreviewUrls(prev => [...prev, ...newUrls])
+    
+    // Reset file input
+    e.target.value = ""
   }
 
   const removeImage = (index: number) => {
-    setUploadedFiles((prev) => prev.filter((_, i) => i !== index))
-    setPreviewUrls((prev) => prev.filter((_, i) => i !== index))
+    const urlToRemove = previewUrls[index]
+    
+    // If it's a blob URL, it's a new file - remove from uploadedFiles
+    if (urlToRemove.startsWith("blob:")) {
+      URL.revokeObjectURL(urlToRemove)
+      // Find the correct index in uploadedFiles by counting blob URLs before this position
+      const newFileIndex = previewUrls.slice(0, index).filter(url => url.startsWith("blob:")).length
+      setUploadedFiles(prev => prev.filter((_, i) => i !== newFileIndex))
+    }
+    
+    setPreviewUrls(prev => prev.filter((_, i) => i !== index))
   }
 
-  const toggleCategory = (catId: number) => {
-    setSelectedCategoryIds((prev) =>
-      prev.includes(catId) ? prev.filter((id) => id !== catId) : [...prev, catId]
-    )
+  const handleFinalSubmit = async () => {
+    const isValid = await validateStep(currentStep)
+    if (!isValid) return
+    
+    // Trigger the form submission via React Hook Form
+    await handleSubmit(handleFormSubmit)()
   }
 
-  const handleFormSubmit = async (data: CreateEventDto | UpdateEventDto) => {
+  const handleFormSubmit = async (data: FormValues) => {
     try {
       setIsSubmitting(true)
 
+      // Validation
       if (new Date(data.startDate!) >= new Date(data.endDate!)) {
         error("End date must be after start date")
+        setIsSubmitting(false)
         return
       }
 
-      if (!data.tickets || data.tickets.length === 0) {
-        error("At least one ticket type is required")
-        return
-      }
-
-      for (let i = 0; i < data.tickets.length; i++) {
-        const t = data.tickets[i]
-        if (new Date(t.salesStartDate) >= new Date(t.salesEndDate)) {
-          error(`Ticket ${i + 1}: Sale end date must be after start date`)
+      // For NEW events or updates without ticket restrictions: validate tickets
+      if (!initialData || !ticketUpdateDisabled) {
+        if (!data.tickets || data.tickets.length === 0) {
+          error("At least one ticket type is required")
+          setIsSubmitting(false)
           return
+        }
+
+        for (let i = 0; i < data.tickets.length; i++) {
+          const t = data.tickets[i]
+          if (new Date(t.salesStartDate) >= new Date(t.salesEndDate)) {
+            error(`Ticket ${i + 1}: Sale end date must be after start date`)
+            setIsSubmitting(false)
+            return
+          }
         }
       }
 
       data.categoryIds = selectedCategoryIds
 
-      if (!initialData && uploadedFiles.length > 0) {
-        const formData = new FormData()
-        uploadedFiles.forEach((f) => formData.append("files", f))
+      const formatIso = (dateStr: string | undefined | null) => {
+        if (!dateStr) return null
+        try {
+          const d = new Date(dateStr)
+          return isNaN(d.getTime()) ? null : d.toISOString()
+        } catch {
+          return null
+        }
+      }
 
-        const eventFormData = new FormData()
-        eventFormData.append("name", data.name!)
-        eventFormData.append("description", data.description!)
-        eventFormData.append("startDate", data.startDate!)
-        eventFormData.append("endDate", data.endDate!)
-        eventFormData.append("capacity", String(data.capacity))
-        eventFormData.append("location", JSON.stringify(data.location))
-        eventFormData.append("tickets", JSON.stringify(data.tickets))
-        eventFormData.append("categoryIds", JSON.stringify(selectedCategoryIds))
-        uploadedFiles.forEach((f) => eventFormData.append("files", f))
+      // For UPDATE: Only send changed fields
+      if (initialData) {
+        console.log("Updating event. ticketUpdateDisabled:", ticketUpdateDisabled)
+        console.log("Initial data bookings:", initialData.bookings)
+        const updateData: any = {}
+        let hasChanges = false
 
-        await onSubmit(data)
+        // Check each field for changes
+        if (data.name !== initialData.name) { updateData.name = data.name; hasChanges = true }
+        if (data.description !== initialData.description) { updateData.description = data.description; hasChanges = true }
+        
+        const newStartDate = formatIso(data.startDate)
+        const oldStartDate = initialData.startDate ? new Date(initialData.startDate).toISOString() : null
+        if (newStartDate !== oldStartDate) { updateData.startDate = newStartDate; hasChanges = true }
+        
+        const newEndDate = formatIso(data.endDate)
+        const oldEndDate = initialData.endDate ? new Date(initialData.endDate).toISOString() : null
+        if (newEndDate !== oldEndDate) { updateData.endDate = newEndDate; hasChanges = true }
+        
+        if (data.capacity !== initialData.capacity) { updateData.capacity = data.capacity; hasChanges = true }
+
+        // Location
+        if (JSON.stringify(data.location) !== JSON.stringify(initialData.location)) {
+          updateData.location = data.location
+          hasChanges = true
+        }
+
+        // Categories
+        if (JSON.stringify(selectedCategoryIds) !== JSON.stringify(initialData.categories?.map(c => c.id))) {
+          updateData.categoryIds = selectedCategoryIds
+          hasChanges = true
+        }
+
+        // Tickets - only if not disabled
+        if (!ticketUpdateDisabled) {
+          const newTickets = data.tickets.map(t => ({
+            ...t,
+            salesStartDate: formatIso(t.salesStartDate) || "",
+            salesEndDate: formatIso(t.salesEndDate) || "",
+          }))
+          updateData.tickets = newTickets
+          hasChanges = true
+          console.log("Adding tickets to update")
+        } else {
+          console.log("Skipping tickets update because ticketUpdateDisabled is true")
+        }
+
+        // Images - only send if there are changes
+        const retainedImages = previewUrls.filter(url => !url.startsWith("blob:"))
+        const oldImages = initialData.images?.map(img => img.imageUrl) || []
+        if (JSON.stringify(retainedImages) !== JSON.stringify(oldImages) || uploadedFiles.length > 0) {
+          updateData.imageUrls = retainedImages
+          hasChanges = true
+        }
+
+        if (!hasChanges && uploadedFiles.length === 0) {
+          error("No changes to update")
+          setIsSubmitting(false)
+          return
+        }
+
+        // If there are new files, use FormData
+        if (uploadedFiles.length > 0) {
+          const formData = new FormData()
+          
+          // Add only changed fields
+          Object.entries(updateData).forEach(([key, value]) => {
+            if (key === "location") {
+              formData.append(key, JSON.stringify(value))
+            } else if (key === "tickets" || key === "categoryIds" || key === "imageUrls") {
+              formData.append(key, JSON.stringify(value))
+            } else if (value !== undefined && value !== null) {
+              formData.append(key, String(value))
+            }
+          })
+          
+          // Append new files
+          uploadedFiles.forEach((f) => formData.append("files", f))
+          
+          console.log("Sending update with files. FormData entries:", Array.from(formData.entries()))
+          await onSubmit(formData as any)
+        } else {
+          // Send as JSON for updates without files
+          console.log("Sending update (no files):", updateData)
+          await onSubmit(updateData as any)
+        }
       } else {
-        await onSubmit(data)
+        // For CREATE: Send all fields with values in FormData if images exist, otherwise JSON
+        const createData: any = {
+          name: data.name,
+          description: data.description,
+          startDate: formatIso(data.startDate) || "",
+          endDate: formatIso(data.endDate) || "",
+          capacity: data.capacity,
+          location: data.location,
+          tickets: data.tickets.map(t => ({
+            ...t,
+            salesStartDate: formatIso(t.salesStartDate) || "",
+            salesEndDate: formatIso(t.salesEndDate) || "",
+          })),
+          categoryIds: selectedCategoryIds,
+          imageUrls: previewUrls.filter(url => !url.startsWith("blob:")),
+        }
+
+        // Remove empty imageUrls for new events
+        if (!createData.imageUrls || createData.imageUrls.length === 0) {
+          createData.imageUrls = []
+        }
+
+        // If there are files, use FormData; otherwise use JSON
+        if (uploadedFiles.length > 0) {
+          const formData = new FormData()
+          formData.append("name", createData.name)
+          formData.append("description", createData.description)
+          formData.append("startDate", createData.startDate)
+          formData.append("endDate", createData.endDate)
+          formData.append("capacity", String(createData.capacity))
+          formData.append("location", JSON.stringify(createData.location))
+          formData.append("tickets", JSON.stringify(createData.tickets))
+          formData.append("categoryIds", JSON.stringify(createData.categoryIds))
+          
+          // Add files
+          uploadedFiles.forEach((f) => formData.append("files", f))
+          
+          await onSubmit(formData as any)
+        } else {
+          // Send as plain JSON for creates without files
+          await onSubmit(createData as any)
+        }
       }
 
       success("Event saved successfully!")
     } catch (err) {
-      if (err instanceof Error && err.message !== "Invalid ticket dates") {
-        error(err.message || "Failed to save event")
+      const errorMsg = err instanceof Error ? err.message : "Failed to save event"
+      console.error("Event submission error:", errorMsg, err)
+      
+      if (errorMsg.includes("Cannot update tickets when bookings exist")) {
+        console.warn("Ticket update disabled due to bookings. Setting flag.")
+        setTicketUpdateDisabled(true)
+        error("This event has bookings. You can only update images and categories.")
+      } else if (errorMsg !== "Invalid ticket dates") {
+        error(errorMsg)
       }
     } finally {
       setIsSubmitting(false)
@@ -166,6 +434,74 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
   }
 
   const progressValue = ((currentStep + 1) / STEPS.length) * 100
+  const currentLocation = watch("location")
+  const addressLabel = [currentLocation.address, currentLocation.city, currentLocation.country]
+    .filter(Boolean)
+    .join(", ")
+
+  const applyPlaceSuggestion = useCallback((place: PlaceSuggestion) => {
+    setValue("location.address", place.address || currentLocation.address || "", { shouldDirty: true })
+    setValue("location.city", place.city || "", { shouldDirty: true })
+    setValue("location.state", place.state || "", { shouldDirty: true })
+    setValue("location.country", place.country || "", { shouldDirty: true })
+    setValue("location.postalCode", place.postalCode || "", { shouldDirty: true })
+    setValue("location.latitude", place.latitude, { shouldDirty: true })
+    setValue("location.longitude", place.longitude, { shouldDirty: true })
+    setPlaceSuggestions([])
+    setPlacesError("")
+  }, [currentLocation.address, setValue])
+
+  useEffect(() => {
+    if (currentStep !== 1) return
+
+    const query = [currentLocation.address, currentLocation.city, currentLocation.country]
+      .filter(Boolean)
+      .join(", ")
+      .trim()
+
+    if (query.length < 6) {
+      setPlaceSuggestions([])
+      setPlacesError("")
+      return
+    }
+
+    const timeoutId = window.setTimeout(async () => {
+      setPlacesLoading(true)
+      setPlacesError("")
+      try {
+        const response = await api.get<PlaceSuggestion[]>("/geo/search", {
+          params: { query, limit: 5 },
+        })
+        setPlaceSuggestions(response.data || [])
+      } catch {
+        setPlacesError("Could not load place suggestions right now.")
+      } finally {
+        setPlacesLoading(false)
+      }
+    }, 450)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [currentLocation.address, currentLocation.city, currentLocation.country, currentStep])
+
+  const reverseFillFromCoordinates = useCallback(async (latitude: number, longitude: number) => {
+    try {
+      const response = await api.get<PlaceSuggestion>("/geo/reverse", {
+        params: { latitude, longitude },
+      })
+      const place = response.data
+      setValue("location.address", place.address || currentLocation.address || "", { shouldDirty: true })
+      setValue("location.city", place.city || currentLocation.city || "", { shouldDirty: true })
+      setValue("location.state", place.state || currentLocation.state || "", { shouldDirty: true })
+      setValue("location.country", place.country || currentLocation.country || "", { shouldDirty: true })
+      setValue("location.postalCode", place.postalCode || currentLocation.postalCode || "", { shouldDirty: true })
+    } catch {
+      // Keep manual fields untouched if reverse geocoding fails.
+    }
+  }, [currentLocation.address, currentLocation.city, currentLocation.country, currentLocation.postalCode, currentLocation.state, setValue])
+
+  function toggleCategory(id: number): void {
+    throw new Error("Function not implemented.")
+  }
 
   return (
     <div className="w-full max-w-4xl mx-auto py-6">
@@ -180,13 +516,16 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
               <div key={step.key} className="flex items-center gap-2 flex-1">
                 <button
                   type="button"
-                  onClick={() => idx < currentStep && setCurrentStep(idx)}
+                  onClick={() => goToStep(idx)}
+                  disabled={!isActive && !isCompleted && !completedSteps.has(idx - 1)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${
                     isActive
                       ? "bg-primary text-primary-foreground"
                       : isCompleted
                       ? "bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400 cursor-pointer"
-                      : "bg-default-100 text-default-500"
+                      : completedSteps.has(idx - 1) || idx === 0
+                      ? "bg-default-100 text-default-600 cursor-pointer hover:bg-default-200"
+                      : "bg-default-100 text-default-500 cursor-not-allowed opacity-50"
                   }`}
                 >
                   {isCompleted ? <Check size={16} /> : <Icon size={16} />}
@@ -202,7 +541,7 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
         <Progress value={progressValue} color="primary" size="sm" />
       </div>
 
-      <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+      <form className="space-y-6" noValidate>
         {/* Step 1: Event Details */}
         {currentStep === 0 && (
           <Card>
@@ -245,7 +584,18 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
               </div>
               <Controller control={control} name="capacity" rules={{ required: "Required", min: { value: 1, message: "Min 1" } }}
                 render={({ field }) => (
-                  <Input {...field} type="number" label="Event Capacity" placeholder="e.g., 500" isInvalid={!!errors.capacity} errorMessage={errors.capacity?.message} variant="bordered" onChange={(e) => field.onChange(parseInt(e.target.value))} className="max-w-xs" />
+                  <Input 
+                    {...field} 
+                    value={String(field.value)}
+                    type="number" 
+                    label="Event Capacity" 
+                    placeholder="e.g., 500" 
+                    isInvalid={!!errors.capacity} 
+                    errorMessage={errors.capacity?.message} 
+                    variant="bordered" 
+                    onChange={(e) => field.onChange(parseNumber(e.target.value, 1))} 
+                    className="max-w-xs" 
+                  />
                 )}
               />
             </CardBody>
@@ -269,6 +619,34 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
                   <Input {...field} label="Street Address" placeholder="e.g., 123 Main Street" isInvalid={!!errors.location?.address} errorMessage={errors.location?.address?.message} variant="bordered" />
                 )}
               />
+              {(placesLoading || placeSuggestions.length > 0 || placesError) && (
+                <div className="rounded-xl border border-default-200 bg-default-50 px-3 py-3">
+                  <div className="text-xs font-medium uppercase tracking-wide text-default-400 mb-2">
+                    Suggested places
+                  </div>
+                  {placesLoading && <p className="text-sm text-default-500">Searching open map data...</p>}
+                  {!placesLoading && placeSuggestions.length > 0 && (
+                    <div className="space-y-2">
+                      {placeSuggestions.map((place) => (
+                        <button
+                          key={`${place.latitude}-${place.longitude}-${place.displayName}`}
+                          type="button"
+                          onClick={() => applyPlaceSuggestion(place)}
+                          className="w-full rounded-lg border border-default-200 bg-background px-3 py-3 text-left transition-colors hover:border-primary hover:bg-primary-50/30"
+                        >
+                          <div className="font-medium text-foreground">{place.displayName}</div>
+                          <div className="text-sm text-default-500">
+                            {[place.address, place.city, place.country].filter(Boolean).join(", ")}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {!placesLoading && !placeSuggestions.length && placesError && (
+                    <p className="text-sm text-danger">{placesError}</p>
+                  )}
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Controller control={control} name="location.city" rules={{ required: "City is required" }}
                   render={({ field }) => (
@@ -298,13 +676,33 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
                   <Input {...field} label="Google Maps Link (Optional)" placeholder="https://maps.google.com/..." type="url" variant="bordered" />
                 )}
               />
+              <InteractiveLocationPicker
+                addressLabel={addressLabel}
+                latitude={currentLocation.latitude}
+                longitude={currentLocation.longitude}
+                onChange={({ latitude, longitude }) => {
+                  setValue("location.latitude", latitude, { shouldDirty: true })
+                  setValue("location.longitude", longitude, { shouldDirty: true })
+                  void reverseFillFromCoordinates(latitude, longitude)
+                }}
+              />
             </CardBody>
           </Card>
         )}
 
         {/* Step 3: Tickets */}
         {currentStep === 2 && (
-          <Card>
+          <>
+            {ticketUpdateDisabled && initialData && (
+              <Card className="bg-warning-50 dark:bg-warning-900/20 border-warning mb-4">
+                <CardBody className="gap-2 px-6 py-4">
+                  <p className="text-sm font-medium text-warning-700 dark:text-warning-400">
+                    ⚠️ This event has bookings, so you cannot modify tickets. You can still update other event details or cancel existing bookings to make ticket changes.
+                  </p>
+                </CardBody>
+              </Card>
+            )}
+            <Card>
             <CardHeader className="flex items-center gap-3 px-6 py-4">
               <Ticket className="text-primary" size={20} />
               <div>
@@ -315,7 +713,7 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
             <Divider />
             <CardBody className="gap-4 px-6 py-6">
               {ticketFields.map((field, index) => (
-                <Card key={field.id} className="border border-default-200 shadow-none">
+                <Card key={field.id} className={ticketUpdateDisabled && initialData ? "border border-default-200 shadow-none opacity-60 pointer-events-none" : "border border-default-200 shadow-none"}>
                   <CardBody className="gap-4 p-4">
                     <div className="flex justify-between items-center">
                       <h3 className="font-semibold text-foreground">Ticket {index + 1}</h3>
@@ -333,7 +731,17 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
                       />
                       <Controller control={control} name={`tickets.${index}.price`} rules={{ required: "Required", min: { value: 0, message: "Min 0" } }}
                         render={({ field }) => (
-                          <Input {...field} type="number" label="Price ($)" placeholder="0.00" isInvalid={!!errors.tickets?.[index]?.price} errorMessage={errors.tickets?.[index]?.price?.message} variant="bordered" onChange={(e) => field.onChange(parseFloat(e.target.value))} />
+                          <Input 
+                            {...field} 
+                            value={String(field.value)}
+                            type="number" 
+                            label="Price ($)" 
+                            placeholder="0.00" 
+                            isInvalid={!!errors.tickets?.[index]?.price} 
+                            errorMessage={errors.tickets?.[index]?.price?.message} 
+                            variant="bordered" 
+                            onChange={(e) => field.onChange(parseNumber(e.target.value, 0))} 
+                          />
                         )}
                       />
                     </div>
@@ -352,17 +760,30 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
                   </CardBody>
                 </Card>
               ))}
-              <Button type="button" color="primary" variant="flat" startContent={<Plus size={16} />}
-                onPress={() => appendTicket({ name: "", price: 0, salesStartDate: "", salesEndDate: "" })}>
-                Add Another Ticket Type
-              </Button>
+              {!ticketUpdateDisabled && (
+                <Button type="button" color="primary" variant="flat" startContent={<Plus size={16} />}
+                  onPress={() => appendTicket({ name: "", price: 0, salesStartDate: "", salesEndDate: "" })}>
+                  Add Another Ticket Type
+                </Button>
+              )}
             </CardBody>
           </Card>
+          </>
         )}
 
         {/* Step 4: Media & Categories */}
         {currentStep === 3 && (
-          <div className="space-y-6">
+          <>
+            {ticketUpdateDisabled && initialData && (
+              <Card className="bg-info-50 dark:bg-info-900/20 border-info mb-6">
+                <CardBody className="gap-2 px-6 py-4">
+                  <p className="text-sm font-medium text-info-700 dark:text-info-400">
+                    ℹ️ This event has bookings. Changes are limited to images and categories only.
+                  </p>
+                </CardBody>
+              </Card>
+            )}
+            <div className="space-y-6">
             <Card>
               <CardHeader className="flex items-center gap-3 px-6 py-4">
                 <ImageIcon className="text-primary" size={20} />
@@ -459,12 +880,14 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
                 </div>
               </CardBody>
             </Card>
-          </div>
+            </div>
+          </>
         )}
 
         {/* Navigation */}
         <div className="flex justify-between items-center pt-4">
           <Button
+            type="button"
             variant="bordered"
             startContent={currentStep === 0 ? undefined : <ArrowLeft size={16} />}
             onPress={currentStep === 0 ? () => navigate("/dashboard/events") : goBack}
@@ -473,11 +896,17 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
           </Button>
           <div className="flex gap-3">
             {currentStep < STEPS.length - 1 ? (
-              <Button color="primary" endContent={<ArrowRight size={16} />} onPress={goNext}>
+              <Button type="button" color="primary" endContent={<ArrowRight size={16} />} onPress={goNext}>
                 Continue
               </Button>
             ) : (
-              <Button color="primary" type="submit" isLoading={isSubmitting || isLoading} startContent={<Check size={16} />}>
+              <Button 
+                type="button" 
+                color="primary" 
+                isLoading={isSubmitting || isLoading} 
+                startContent={<Check size={16} />}
+                onPress={handleFinalSubmit}
+              >
                 {initialData ? "Update Event" : "Create Event"}
               </Button>
             )}

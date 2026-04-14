@@ -14,7 +14,7 @@ async function seed() {
   // Initialize DataSource
   const dataSource = new DataSource({
     type: 'postgres',
-    url: 'postgresql://neondb_owner:npg_ez7Y4xFSvZgR@ep-flat-shape-ah5yib9s-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require',
+    url: process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_ez7Y4xFSvZgR@ep-flat-shape-ah5yib9s-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require',
     entities: [
       User,
       OrganizerProfile,
@@ -149,8 +149,8 @@ async function seed() {
   const event1 = await eventRepo.save({
     name: 'Summer Music Festival 2025',
     description: 'The biggest music festival of the year featuring top artists from around the world. Three days of non-stop music, food, and entertainment.',
-    startDate: new Date('2025-07-15T12:00:00'),
-    endDate: new Date('2025-07-17T23:00:00'),
+    startDate: new Date('2027-07-15T12:00:00'),
+    endDate: new Date('2027-07-17T23:00:00'),
     capacity: 5000,
     organizer: organizer1,
     location: location1,
@@ -166,22 +166,22 @@ async function seed() {
     {
       name: 'Early Bird',
       price: 99.99,
-      salesStartDate: new Date('2025-01-01'),
-      salesEndDate: new Date('2025-06-01'),
+      salesStartDate: new Date('2027-01-01'),
+      salesEndDate: new Date('2027-06-01'),
       event: event1,
     },
     {
       name: 'General Admission',
       price: 149.99,
-      salesStartDate: new Date('2025-06-02'),
-      salesEndDate: new Date('2025-07-14'),
+      salesStartDate: new Date('2027-06-02'),
+      salesEndDate: new Date('2027-07-14'),
       event: event1,
     },
     {
       name: 'VIP Pass',
       price: 299.99,
-      salesStartDate: new Date('2025-01-01'),
-      salesEndDate: new Date('2025-07-14'),
+      salesStartDate: new Date('2027-01-01'),
+      salesEndDate: new Date('2027-07-14'),
       event: event1,
     },
   ]);
@@ -199,8 +199,8 @@ async function seed() {
   const event2 = await eventRepo.save({
     name: 'TechSummit 2025',
     description: 'Join industry leaders and innovators for a day of insights into the future of technology. Keynotes, workshops, and networking opportunities.',
-    startDate: new Date('2025-08-20T09:00:00'),
-    endDate: new Date('2025-08-20T18:00:00'),
+    startDate: new Date('2027-08-20T09:00:00'),
+    endDate: new Date('2027-08-20T18:00:00'),
     capacity: 500,
     organizer: organizer2,
     location: location2,
@@ -215,15 +215,15 @@ async function seed() {
     {
       name: 'Standard Pass',
       price: 199.00,
-      salesStartDate: new Date('2025-02-01'),
-      salesEndDate: new Date('2025-08-19'),
+      salesStartDate: new Date('2027-02-01'),
+      salesEndDate: new Date('2027-08-19'),
       event: event2,
     },
     {
       name: 'Premium Pass',
       price: 399.00,
-      salesStartDate: new Date('2025-02-01'),
-      salesEndDate: new Date('2025-08-19'),
+      salesStartDate: new Date('2027-02-01'),
+      salesEndDate: new Date('2027-08-19'),
       event: event2,
     },
   ]);
@@ -241,8 +241,8 @@ async function seed() {
   const event3 = await eventRepo.save({
     name: 'International Food Festival',
     description: 'Taste dishes from over 50 countries. Meet renowned chefs, attend cooking demonstrations, and enjoy live entertainment.',
-    startDate: new Date('2025-09-10T11:00:00'),
-    endDate: new Date('2025-09-12T22:00:00'),
+    startDate: new Date('2027-09-10T11:00:00'),
+    endDate: new Date('2027-09-12T22:00:00'),
     capacity: 3000,
     organizer: organizer1,
     location: location3,
@@ -257,15 +257,15 @@ async function seed() {
     {
       name: 'Day Pass',
       price: 45.00,
-      salesStartDate: new Date('2025-05-01'),
-      salesEndDate: new Date('2025-09-09'),
+      salesStartDate: new Date('2027-05-01'),
+      salesEndDate: new Date('2027-09-09'),
       event: event3,
     },
     {
       name: '3-Day Pass',
       price: 120.00,
-      salesStartDate: new Date('2025-05-01'),
-      salesEndDate: new Date('2025-09-09'),
+      salesStartDate: new Date('2027-05-01'),
+      salesEndDate: new Date('2027-09-09'),
       event: event3,
     },
   ]);
@@ -283,8 +283,8 @@ async function seed() {
   const event4 = await eventRepo.save({
     name: 'NYC Marathon 2024',
     description: 'Annual marathon through the streets of New York City. A challenging course with amazing crowd support.',
-    startDate: new Date('2024-11-03T08:00:00'),
-    endDate: new Date('2024-11-03T16:00:00'),
+    startDate: new Date('2026-11-03T08:00:00'),
+    endDate: new Date('2026-11-03T16:00:00'),
     capacity: 10000,
     organizer: organizer2,
     location: location4,
@@ -299,8 +299,8 @@ async function seed() {
     {
       name: 'Runner Registration',
       price: 150.00,
-      salesStartDate: new Date('2024-06-01'),
-      salesEndDate: new Date('2024-10-31'),
+      salesStartDate: new Date('2026-06-01'),
+      salesEndDate: new Date('2026-10-31'),
       event: event4,
     },
   ]);
@@ -318,8 +318,8 @@ async function seed() {
   const event5 = await eventRepo.save({
     name: 'Modern Art Exhibition',
     description: 'Featuring contemporary works from emerging and established artists. A journey through modern artistic expression.',
-    startDate: new Date('2024-10-15T10:00:00'),
-    endDate: new Date('2024-10-20T20:00:00'),
+    startDate: new Date('2026-10-15T10:00:00'),
+    endDate: new Date('2026-10-20T20:00:00'),
     capacity: 200,
     organizer: organizer1,
     location: location5,
@@ -334,8 +334,8 @@ async function seed() {
     {
       name: 'General Admission',
       price: 25.00,
-      salesStartDate: new Date('2024-09-01'),
-      salesEndDate: new Date('2024-10-19'),
+      salesStartDate: new Date('2026-09-01'),
+      salesEndDate: new Date('2026-10-19'),
       event: event5,
     },
   ]);
@@ -386,28 +386,28 @@ async function seed() {
       event: event4,
       ticket: marathonTickets[0],
       status: 'CONFIRMED',
-      bookingDate: new Date('2024-09-15'),
+      bookingDate: new Date('2026-09-15'),
     },
     {
       user: attendee2,
       event: event4,
       ticket: marathonTickets[0],
       status: 'CONFIRMED',
-      bookingDate: new Date('2024-09-20'),
+      bookingDate: new Date('2026-09-20'),
     },
     {
       user: attendee3,
       event: event5,
       ticket: artTickets[0],
       status: 'CONFIRMED',
-      bookingDate: new Date('2024-10-01'),
+      bookingDate: new Date('2026-10-01'),
     },
     {
       user: attendee1,
       event: event5,
       ticket: artTickets[0],
       status: 'CANCELLED',
-      bookingDate: new Date('2024-10-02'),
+      bookingDate: new Date('2026-10-02'),
     },
   ]);
 

@@ -33,8 +33,10 @@ export default (): PostgresConnectionOptions => ({
     Follow,
     PromoCode,
   ],
-  synchronize: true, // this is only for development env (set to false for production)
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  synchronize: process.env.TYPEORM_SYNCHRONIZE === 'true',
+  ssl: process.env.DATABASE_SSL === 'true'
+    ? {
+        rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === 'true',
+      }
+    : false,
 });

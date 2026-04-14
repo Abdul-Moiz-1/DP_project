@@ -38,7 +38,10 @@ export class FilesValidationPipe implements PipeTransform {
       | Record<string, Express.Multer.File[]>,
     metadata: ArgumentMetadata,
   ): any {
-    if (!value) {
+    if (!value || (Array.isArray(value) && value.length === 0)) {
+      if (!this.options.requireFilesInEachField) {
+        return value;
+      }
       throw new BadRequestException('No files uploaded');
     }
 
@@ -50,9 +53,6 @@ export class FilesValidationPipe implements PipeTransform {
 
     // 2️⃣ Array of files for one field (FilesInterceptor)
     if (Array.isArray(value)) {
-      if (this.options.requireFilesInEachField && value.length === 0) {
-        throw new BadRequestException(`At least one file is required`);
-      }
       // validate each as a single file
       value.forEach((file) => {
         if (!this.isSingleFile(file)) {

@@ -2,7 +2,7 @@
 
 // src/pages/EventDetails.tsx
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Button,
   Divider,
@@ -19,22 +19,22 @@ import BookingModal from '../components/events/BookingModal';
 import ReviewsTab from '../components/events/ReviewsTab';
 import OrganizerCard from '../components/events/OrganizerCard';
 import SidebarBookingCard from '../components/events/SidebarBookingCard';
-import EventMap from '../components/events/EventMap';
+import { EventMap } from '../components/events/EventMap';
+import { EventLocationMap } from '../components/events/EventLocationMap';
 import ShareButton from '../components/events/ShareButton';
 import AddToCalendar from '../components/events/AddToCalendar';
-import {Event, Review} from '@/api/types'
+import { Review } from '@/api/types';
 import { LoaderCircle } from 'lucide-react';
 import { api } from '@/api/api';
 import { useToast } from '@/components/toast-provider';
 import { EventResponseDto } from '@/lib/dtos';
 import { eventService } from '@/services/eventService';
-// import { TicketType } from '@/types/event.types';
 
 
 interface ReviewStats {
   averageRating: number;
   totalReviews: number;
-  ratings: {"1":0,"2":0,"3":0,"4":0,"5":0};
+  ratings: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
 }
 
 interface ReviewsResponse {
@@ -62,52 +62,54 @@ const EventDetails = () => {
   const [loading, setLoading] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [savingWishlist, setSavingWishlist] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
 
   const eventId: number = parseInt(id || '0', 10);
 
-  const {warning, success} = useToast()
+  const { warning, success } = useToast()
 
-  useEffect(()=> {
-    // fetch event by id logic here
+  useEffect(() => {
+    if (!eventId) return;
     setLoading(true);
-    try {
-      async function fetchEvent(){
-        
-        const eventResponse = await api.get(`/events/${eventId}`);
-        console.log(eventResponse)
-        const eventData:EventResponseDto = await eventResponse.data;
-        const remainingTickets = eventData.capacity - eventData.bookings 
+
+    const fetchAll = async () => {
+      try {
+        const [eventRes, reviewsRes] = await Promise.all([
+          api.get(`/events/${eventId}`),
+          api.get(`/reviews/event/${eventId}`),
+        ]);
+        const eventData: EventResponseDto = eventRes.data;
         setEvent(eventData);
-        setAvailableTickets(remainingTickets)
+        setAvailableTickets(eventData.capacity - (eventData.bookings ?? 0));
+        setReviewsData(reviewsRes.data || null);
+        setReviews(reviewsRes.data?.items || []);
+
+        if (isAuthenticated && eventData.organizer?.id) {
+          const [savedRes, following] = await Promise.allSettled([
+            eventService.checkEventSaved(eventId),
+            eventService.fetchFollowing(),
+          ]);
+
+          if (savedRes.status === 'fulfilled') {
+            setIsSaved(savedRes.value.isSaved);
+          }
+
+          if (following.status === 'fulfilled') {
+            setIsFollowing(
+              following.value.some((f: any) => f.id === eventData.organizer.id),
+            );
+          }
+        }
+      } catch (error) {
+        console.error('Error loading event details:', error);
+      } finally {
+        setLoading(false);
       }
-      fetchEvent().finally(() => setLoading(false));
-    } catch (error) {
-      console.error("Error fetching event:", error);
-      throw error;
-    }
+    };
 
-    try {
-      async function fetchReviews(){
-        const reviewsResponse = await api.get(`/reviews/event/${eventId}`);
-        console.log(reviewsResponse)
-        const reviewsData = reviewsResponse.data;
-        console.log(`Reviews data : ${JSON.stringify(reviewsData)}`);
-        setReviewsData(reviewsData || null);
-        setReviews(reviewsData.items || []);
-        
-      }
-      fetchReviews().finally(() => setLoading(false));
-    } catch (error) {
-      console.error("Error fetching reviews:", error);
-    }
-
-    if (isAuthenticated) {
-      eventService.checkEventSaved(eventId)
-        .then((res) => setIsSaved(res.isSaved))
-        .catch(() => {});
-    }
-
-  }, [id, isAuthenticated])
+    fetchAll();
+  }, [eventId, isAuthenticated]);
 
 
 
@@ -122,27 +124,27 @@ const EventDetails = () => {
 
   const handlePurchase = async (ticketId: string) => {
     if (!event) return;
-    
+
     try {
       setLoading(true);
       const response = await api.post(`/bookings`, {
-          eventId: event.id,
-          ticketId: parseInt(ticketId),
+        eventId: event.id,
+        ticketId: parseInt(ticketId),
       });
-      
-      if (!(response.status == 200)) {
+
+      if (response.status < 200 || response.status >= 300) {
         throw new Error('Failed to create booking');
       }
-      
-      const data = await response.data;
+
+      const data = response.data;
       setBookingOpen(false);
-      navigate('/dashboard/my-tickets', { 
-        state: { 
+      navigate('/dashboard/my-tickets', {
+        state: {
           bookingSuccess: true,
           bookingId: data.id
-        } 
+        }
       });
-    } catch (error:any) {
+    } catch (error: any) {
       console.error('Error creating booking:', error?.response?.data.message);
       setBookingOpen(false)
       warning(error?.response.data.message)
@@ -151,26 +153,40 @@ const EventDetails = () => {
     }
   };
 
-   const handleSubmitReview = async (rating: number, comment: string) => {
-    console.log('submit review:', rating, comment);
-    setLoading(true)
-    // call API or optimistic update
+  const handleSubmitReview = async (rating: number, comment: string) => {
+    setLoading(true);
     try {
-      const response = await api.post(`/reviews`,{
-        eventId,
-        rating,
-        comment
-      })
-      if(!(response.status == 200)){
-        warning(response.data?.message)
-        throw new Error(`Error in create review ${response.data?.message}`)
+      await api.post(`/reviews`, { eventId, rating, comment });
+      // Refresh reviews after submission
+      const reviewsRes = await api.get(`/reviews/event/${eventId}`);
+      setReviewsData(reviewsRes.data || null);
+      setReviews(reviewsRes.data?.items || []);
+      success('Review submitted!');
+    } catch (error: any) {
+      warning(error?.response?.data?.message || 'Failed to submit review');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFollowOrganizer = async () => {
+    if (!isAuthenticated) { navigate('/login'); return; }
+    if (!event?.organizer?.id) return;
+    setFollowLoading(true);
+    try {
+      if (isFollowing) {
+        await eventService.unfollowOrganizer(event.organizer.id);
+        setIsFollowing(false);
+        success('Unfollowed organizer');
+      } else {
+        await eventService.followOrganizer(event.organizer.id);
+        setIsFollowing(true);
+        success('Following organizer!');
       }
     } catch (error: any) {
-      warning(error?.response?.data?.message)
-      throw new Error(`Failed to create review ${error?.response?.data?.message}`)
-      
+      warning(error?.response?.data?.message || 'Could not update follow status');
     } finally {
-      setLoading(false)
+      setFollowLoading(false);
     }
   };
 
@@ -201,7 +217,7 @@ const EventDetails = () => {
     navigate('/login');
   };
 
-    return (
+  return (
     <div className="min-h-screen bg-background">
       {loading && (
         <div className="fixed inset-0 flex items-center justify-center bg-background/60 backdrop-blur-sm z-50">
@@ -219,11 +235,11 @@ const EventDetails = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
             <EventHeader
-              title={event ? event.name: 'N/A'}
+              title={event ? event.name : 'N/A'}
               category={event?.categories.map(cat => cat.name).join(', ') || ''}
               rating={reviewsData?.stats?.averageRating ?? 0}
               reviewsCount={reviewsData?.stats?.totalReviews ?? 0}
-              attendees={event?.bookings}
+              attendees={event?.bookings || 0}
               isVerified={true}
             />
 
@@ -243,10 +259,10 @@ const EventDetails = () => {
             <Divider />
 
             <EventInfoCard
-              date={event? event.startDate: 'Start Date'}
-              endDate={event? event.endDate: 'End Date'}
-              location={event? event.location.city: 'Location'}
-              address={event ? event.location.address: 'Address'}
+              date={event ? event.startDate : 'Start Date'}
+              endDate={event ? event.endDate : 'End Date'}
+              location={event ? event.location.city : 'Location'}
+              address={event ? event.location.address : 'Address'}
               availableTickets={availableTickets}
               totalTickets={event?.capacity || 0}
             />
@@ -263,7 +279,7 @@ const EventDetails = () => {
               <Tab key="tickets" title="Tickets">
                 <div className="pt-4">
                   <TicketsTab
-                    ticketTypes={event ? event.tickets: []}
+                    ticketTypes={event ? event.tickets : []}
                     selectedTicketId={selectedTicketId}
                     onSelectTicket={setSelectedTicketId}
                   />
@@ -273,12 +289,9 @@ const EventDetails = () => {
               {event?.location?.latitude && event?.location?.longitude && (
                 <Tab key="location" title="Location">
                   <div className="pt-4">
-                    <EventMap
-                      latitude={event.location.latitude}
-                      longitude={event.location.longitude}
-                      eventName={event.name}
-                      address={`${event.location.address}, ${event.location.city}`}
+                    <EventLocationMap
                       eventId={event.id}
+                      location={event.location}
                     />
                   </div>
                 </Tab>
@@ -301,9 +314,9 @@ const EventDetails = () => {
               name={event?.organizer?.organizerProfile?.organizationName || event?.organizer.name || 'Organizer'}
               bio={`Organized by ${event?.organizer.name || 'Unknown'}`}
               isVerified={true}
-              onFollow={() => {
-                console.log('follow organizer');
-              }}
+              isFollowing={isFollowing}
+              followLoading={followLoading}
+              onFollow={handleFollowOrganizer}
             />
           </div>
 
@@ -312,9 +325,9 @@ const EventDetails = () => {
               price={event?.tickets ? Math.min(...event.tickets.map(t => t.price)) : 0}
               availableTickets={availableTickets}
               category={event?.categories ? event.categories.map(cat => cat.name).join(', ') : 'N/A'}
-              rating={reviewsData? reviewsData.stats.averageRating : 0}
+              rating={reviewsData ? reviewsData.stats.averageRating : 0}
               onBook={handleBookClick}
-              endDate={event? event.endDate: 'Date not found'}
+              endDate={event ? event.endDate : 'Date not found'}
               onWishlist={handleWishlist}
               isSaved={isSaved}
               savingWishlist={savingWishlist}
@@ -330,10 +343,10 @@ const EventDetails = () => {
         onPurchase={handlePurchase}
       />
     </div>
-  ); 
+  );
 
-  }
-  
+}
+
 
 
 export default EventDetails;

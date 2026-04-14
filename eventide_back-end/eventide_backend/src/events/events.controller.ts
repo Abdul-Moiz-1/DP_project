@@ -48,6 +48,7 @@ export class EventsController {
       new FilesValidationPipe({
         maxSize: 2 * 1024 * 1024,
         allowedTypes: ['image/png', 'image/jpeg'],
+        requireFilesInEachField: false,
       }),
     )
     files: Express.Multer.File[],
@@ -68,8 +69,31 @@ export class EventsController {
 
   @Get('recommended')
   @UseGuards(JwtAuthGuard)
-  getRecommended(@GetUser('userId') userId: number) {
-    return this.eventsService.getRecommended(userId);
+  getRecommended(
+    @GetUser('userId') userId: number,
+    @Query('latitude') latitude?: number,
+    @Query('longitude') longitude?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.eventsService.getRecommended(userId, limit || 10, latitude, longitude);
+  }
+
+  @Get('trending')
+  getTrending(@Query('limit') limit?: number) {
+    return this.eventsService.getTrending(limit || 10);
+  }
+
+  @Get('nearby')
+  getNearby(
+    @Query('latitude') latitude: number,
+    @Query('longitude') longitude: number,
+    @Query('radius') radius?: number,
+    @Query('limit') limit?: number,
+  ) {
+    if (latitude === undefined || longitude === undefined) {
+      throw new BadRequestException('latitude and longitude are required');
+    }
+    return this.eventsService.getNearby(latitude, longitude, radius || 50, limit || 10);
   }
 
   @Get('my-events')
@@ -97,13 +121,23 @@ export class EventsController {
     return this.eventsService.getEventAnalytics(id, userId);
   }
 
+  @Get(':id/manage')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Role(UserRole.ORGANIZER)
+  getManageEvent(
+    @Param('id', ParseIntPipe) id: number,
+    @GetUser('userId') userId: number,
+  ) {
+    return this.eventsService.findManagedEvent(id, userId);
+  }
+
   @Get(':id/directions')
   async getDirections(
     @Param('id', ParseIntPipe) id: number,
     @Query('fromLat') fromLat: number,
     @Query('fromLng') fromLng: number,
   ) {
-    if (!fromLat || !fromLng) {
+    if (fromLat === undefined || fromLng === undefined) {
       throw new BadRequestException('fromLat and fromLng are required');
     }
     const event = await this.eventsService.findOne(id);
@@ -127,12 +161,21 @@ export class EventsController {
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Role(UserRole.ORGANIZER)
+  @UseInterceptors(FilesInterceptor('files', 5))
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateEventDto,
     @GetUser('userId') userId: number,
+    @UploadedFiles(
+      new FilesValidationPipe({
+        maxSize: 2 * 1024 * 1024,
+        allowedTypes: ['image/png', 'image/jpeg'],
+        requireFilesInEachField: false,
+      }),
+    )
+    files?: Express.Multer.File[],
   ): Promise<EventResponseDto> {
-    return this.eventsService.update(id, dto, userId);
+    return this.eventsService.update(id, dto, userId, files);
   }
 
   @Patch(':id/status')

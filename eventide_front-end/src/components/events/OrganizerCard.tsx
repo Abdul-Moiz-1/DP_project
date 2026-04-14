@@ -1,4 +1,3 @@
-// src/components/Event/OrganizerCard.tsx
 import React from 'react';
 import { Card, CardBody, Avatar, Chip, Button } from '@heroui/react';
 
@@ -7,6 +6,8 @@ interface OrganizerCardProps {
   name: string;
   bio?: string;
   isVerified?: boolean;
+  isFollowing?: boolean;
+  followLoading?: boolean;
   onFollow?: () => void;
 }
 
@@ -15,6 +16,8 @@ const OrganizerCard: React.FC<OrganizerCardProps> = ({
   name,
   bio,
   isVerified = false,
+  isFollowing = false,
+  followLoading = false,
   onFollow,
 }) => {
   return (
@@ -23,7 +26,6 @@ const OrganizerCard: React.FC<OrganizerCardProps> = ({
         <h3 className="font-bold text-lg mb-4">Organized By</h3>
         <div className="flex items-center gap-4">
           <Avatar
-            src={avatar}
             name={name}
             size="lg"
             isBordered
@@ -40,8 +42,14 @@ const OrganizerCard: React.FC<OrganizerCardProps> = ({
             </div>
             {bio && <p className="text-sm text-default-500">{bio}</p>}
           </div>
-          <Button variant="bordered" size="sm" onPress={onFollow}>
-            Follow
+          <Button
+            variant={isFollowing ? 'solid' : 'bordered'}
+            color={isFollowing ? 'primary' : 'default'}
+            size="sm"
+            isLoading={followLoading}
+            onPress={onFollow}
+          >
+            {isFollowing ? 'Following' : 'Follow'}
           </Button>
         </div>
       </CardBody>
@@ -50,3 +58,5 @@ const OrganizerCard: React.FC<OrganizerCardProps> = ({
 };
 
 export default OrganizerCard;
+
+

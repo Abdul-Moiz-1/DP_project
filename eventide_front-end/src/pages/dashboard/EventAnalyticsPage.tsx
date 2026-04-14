@@ -24,6 +24,15 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { EventAnalytics } from "@/api/types";
 import { eventService } from "@/services/eventService";
 import { MetricCard } from "@/components/dashboard/metric-card";
@@ -225,7 +234,7 @@ export default function EventAnalyticsPage() {
             </div>
           </CardHeader>
           <CardBody className="px-6 pb-5">
-            <div className="text-center mb-4">
+            <div className="text-center mb-6">
               <p className="text-4xl font-bold text-foreground">
                 ${analytics.totalRevenue.toLocaleString()}
               </p>
@@ -234,28 +243,40 @@ export default function EventAnalyticsPage() {
               </p>
             </div>
             {analytics.ticketsSold.length > 0 ? (
-              <div className="space-y-3">
-                {analytics.ticketsSold.map((ticket, idx) => {
-                  const maxRevenue = Math.max(
-                    ...analytics.ticketsSold.map((t) => t.revenue),
-                    1
-                  );
-                  return (
-                    <div key={idx} className="space-y-1">
-                      <div className="flex justify-between text-sm">
-                        <span className="font-medium">{ticket.ticketName}</span>
-                        <span className="text-default-500">
-                          {ticket.sold} sold · ${ticket.revenue.toLocaleString()}
-                        </span>
-                      </div>
-                      <Progress
-                        value={(ticket.revenue / maxRevenue) * 100}
-                        color="success"
-                        size="sm"
-                      />
-                    </div>
-                  );
-                })}
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={analytics.ticketsSold}
+                    margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-default-200" />
+                    <XAxis
+                      dataKey="ticketName"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: 'currentColor', fontSize: 12 }}
+                      className="text-default-500"
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: 'currentColor', fontSize: 12 }}
+                      tickFormatter={(value) => `$${value}`}
+                      className="text-default-500"
+                    />
+                    <Tooltip
+                      cursor={{ fill: 'transparent' }}
+                      contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      formatter={(value: any) => [`$${Number(value).toLocaleString()}`, 'Revenue']}
+                    />
+                    <Bar
+                      dataKey="revenue"
+                      fill="#17c964" // Success color
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={50}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             ) : (
               <p className="text-center text-default-400 py-4">

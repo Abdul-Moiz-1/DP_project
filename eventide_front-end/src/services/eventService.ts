@@ -1,38 +1,21 @@
 import {api} from '@/api/api';
 import { Event, Booking, BookingResponse } from '@/api/types';
 
-/**
- * Fetches the events created by the currently logged-in organizer.
- * This corresponds to the [GET] /events/my-events endpoint.
- */
+// ─── Events ──────────────────────────────────────────────────────────────────
+
 export const fetchMyEvents = async (): Promise<Event[]> => {
-  try {
-    // The auth token is automatically added by the Axios interceptor
-    const response = await api.get<Event[]>('/events/my-events');
-    return response.data;
-  } catch (error) {
-    console.error('Failed to fetch organizer events:', error);
-    // Re-throw the error so the context can handle it
-    throw error;
-  }
+  const response = await api.get<Event[]>('/events/my-events');
+  return response.data;
 };
 
-/**
- * Fetches the bookings made by the currently logged-in user.
- * This corresponds to the [GET] /bookings/my-bookings endpoint.
- */
+export const updateEventStatus = async (eventId: number, status: string) => {
+  const response = await api.patch(`/events/${eventId}/status`, { status });
+  return response.data;
+};
+
 export const fetchMyBookings = async (): Promise<BookingResponse> => {
-  try {
-    // The auth token is automatically added by the Axios interceptor
-    const response = await api.get<BookingResponse>('/bookings/my-bookings');
-    console.log("Fetched Bookings, ", response.data)
-    return response.data;
-    
-  } catch (error) {
-    console.error('Failed to fetch user bookings:', error);
-    // Re-throw the error so the context can handle it
-    throw error;
-  }
+  const response = await api.get<BookingResponse>('/bookings/my-bookings');
+  return response.data;
 };
 
 export const fetchOrganizerStats = async () => {
@@ -55,7 +38,25 @@ export const fetchEventBookings = async (eventId: number) => {
   return response.data;
 };
 
-// Saved Events / Wishlist
+export const fetchTrendingEvents = async (): Promise<Event[]> => {
+  const response = await api.get('/events/trending');
+  return response.data;
+};
+
+export const fetchRecommendedEvents = async (latitude?: number, longitude?: number): Promise<Event[]> => {
+  const response = await api.get('/events/recommended', {
+    params: latitude !== undefined && longitude !== undefined ? { latitude, longitude } : undefined,
+  });
+  return response.data;
+};
+
+export const fetchNearbyEvents = async (lat: number, lng: number, radius = 50): Promise<Event[]> => {
+  const response = await api.get('/events/nearby', { params: { latitude: lat, longitude: lng, radius } });
+  return response.data;
+};
+
+// ─── Saved Events / Wishlist ──────────────────────────────────────────────────
+
 export const saveEvent = async (eventId: number) => {
   const response = await api.post('/saved-events', { eventId });
   return response.data;
@@ -76,7 +77,8 @@ export const checkEventSaved = async (eventId: number) => {
   return response.data;
 };
 
-// Reviews
+// ─── Reviews ─────────────────────────────────────────────────────────────────
+
 export const fetchMyReviews = async () => {
   const response = await api.get('/reviews/my-reviews');
   return response.data;
@@ -97,7 +99,8 @@ export const deleteReview = async (reviewId: number) => {
   return response.data;
 };
 
-// Profile
+// ─── Profile ──────────────────────────────────────────────────────────────────
+
 export const updateProfile = async (data: { name: string }) => {
   const response = await api.patch('/users/profile', data);
   return response.data;
@@ -113,9 +116,45 @@ export const updateOrganizerProfile = async (data: Record<string, string>) => {
   return response.data;
 };
 
+// ─── Follow / Unfollow Organizer ──────────────────────────────────────────────
+// Implements the Follow/Unfollow strategy used by the Observer pattern on the backend.
+
+export const followOrganizer = async (organizerId: number) => {
+  const response = await api.post(`/users/follow/${organizerId}`);
+  return response.data;
+};
+
+export const unfollowOrganizer = async (organizerId: number) => {
+  const response = await api.delete(`/users/follow/${organizerId}`);
+  return response.data;
+};
+
+export const fetchFollowing = async () => {
+  const response = await api.get('/users/following');
+  return response.data;
+};
+
+// ─── User Preferences ────────────────────────────────────────────────────────
+
+export const fetchUserPreferences = async () => {
+  const response = await api.get('/users/preferences');
+  return response.data;
+};
+
+export const setUserPreferences = async (categoryIds: number[]) => {
+  const response = await api.post('/users/preferences', { categoryIds });
+  return response.data;
+};
+
+// ─── Service Object (for named imports) ──────────────────────────────────────
+
 export const eventService = {
   fetchMyEvents,
+  updateEventStatus,
   fetchMyBookings,
+  fetchTrendingEvents,
+  fetchRecommendedEvents,
+  fetchNearbyEvents,
   fetchOrganizerStats,
   fetchEventAnalytics,
   fetchAttendeeStats,
@@ -131,4 +170,11 @@ export const eventService = {
   updateProfile,
   changePassword,
   updateOrganizerProfile,
+  followOrganizer,
+  unfollowOrganizer,
+  fetchFollowing,
+  fetchUserPreferences,
+  setUserPreferences,
 };
+
+

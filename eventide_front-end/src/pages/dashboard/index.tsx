@@ -508,6 +508,7 @@ function AttendeeDashboardWrapper() {
   }, []);
 
   const loadData = async () => {
+    setLoading(true);
     try {
       const [statsData, bookingsData] = await Promise.all([
         eventService.fetchAttendeeStats(),
@@ -517,6 +518,14 @@ function AttendeeDashboardWrapper() {
       setBookings(bookingsData?.items || []);
     } catch (error) {
       console.error("Failed to load attendee dashboard:", error);
+      // Fallback to empty data to allow the dashboard to render at least
+      setStats({
+        totalBookings: 0,
+        upcomingEvents: 0,
+        pastEvents: 0,
+        totalSpent: 0,
+      });
+      setBookings([]);
     } finally {
       setLoading(false);
     }

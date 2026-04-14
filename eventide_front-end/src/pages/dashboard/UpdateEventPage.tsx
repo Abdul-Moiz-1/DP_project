@@ -17,7 +17,7 @@ export default function UpdateEventPage() {
   const fetchInitialData = async (eventId: number) => {
     setLoading(true)
     try {
-      const response = await api.get(`events/${eventId}`)
+      const response = await api.get(`/events/${eventId}/manage`)
       const data = response.data;
       setInitialData(data)
       setLoading(false)

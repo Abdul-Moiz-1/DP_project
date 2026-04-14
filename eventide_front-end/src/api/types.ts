@@ -3,7 +3,7 @@ export interface User {
   id: number;
   name: string;
   email: string;
-  role: 'USER' | 'ORGANIZER';
+  role: 'USER' | 'ORGANIZER' | 'ADMIN';
   organizerProfile?: OrganizerProfile
 }
 
@@ -35,6 +35,7 @@ export interface Event {
   id: number;
   name: string;
   description: string;
+  status?: string;
   startDate: string;
   endDate: string;
   capacity: number;
@@ -51,12 +52,18 @@ export interface Event {
     state: string;
     country: string;
     postalCode: string;
+    latitude?: number;
+    longitude?: number;
     googleMapsLink?: string;
   };
   images: { id: number; imageUrl: string }[];
   tickets?: Ticket[];
   categories: Category[];
+  bookings?: number;
   createdAt: string;
+  recommendationScore?: number;
+  recommendationReasons?: string[];
+  distanceKm?: number;
 }
 
 export interface Review {

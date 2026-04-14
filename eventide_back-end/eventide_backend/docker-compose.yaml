@@ -20,4 +20,27 @@ services:
     ports:
       - "4000:3000"
     env_file: .env
+    restart: unless-stopped
     command: npm run start:prod
+
+  osrm-prepare:
+    image: ghcr.io/project-osrm/osrm-backend:latest
+    container_name: eventide-osrm-prepare
+    profiles: ["maps-prepare"]
+    volumes:
+      - ./data/osrm:/data
+    command: >
+      sh -c "osrm-extract -p /opt/car.lua /data/map.osm.pbf &&
+      osrm-partition /data/map.osrm &&
+      osrm-customize /data/map.osrm"
+
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:latest
+    container_name: eventide-osrm
+    profiles: ["maps"]
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data/osrm:/data
+    command: osrm-routed --algorithm mld /data/map.osrm
+    restart: unless-stopped

@@ -14,6 +14,7 @@ import { UploadModule } from './upload/upload.module';
 import { SavedEventsModule } from './saved-events/saved-events.module';
 import { PromoCodesModule } from './promo-codes/promo-codes.module';
 import dbConfig from './config/dbConfig';
+import { GeoModule } from './geo/geo.module';
 
 
 @Module({
@@ -36,6 +37,7 @@ import dbConfig from './config/dbConfig';
     CategoriesModule,
     SavedEventsModule,
     PromoCodesModule,
+    GeoModule,
   ],
   controllers: [AppController],
   providers: [AppService],

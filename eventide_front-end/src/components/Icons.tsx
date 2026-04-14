@@ -215,15 +215,21 @@ export const SearchIcon = (props: IconSvgProps) => (
 //   </svg>
 // );
 
-export const UserIcon = () => (
+export const UserIcon = ({
+  size = 24,
+  width,
+  height,
+  ...props
+}: IconSvgProps) => (
   <svg
     aria-hidden="true"
     fill="none"
     focusable="false"
-    height="1em"
+    height={size || height}
     role="presentation"
     viewBox="0 0 24 24"
-    width="1em"
+    width={size || width}
+    {...props}
   >
     <path
       d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 5C13.66 5 15 6.34 15 8C15 9.66 13.66 11 12 11C10.34 11 9 9.66 9 8C9 6.34 10.34 5 12 5ZM12 19.2C9.5 19.2 7.29 17.92 6 15.98C6.03 13.99 10 12.9 12 12.9C13.99 12.9 17.97 13.99 18 15.98C16.71 17.92 14.5 19.2 12 19.2Z"
@@ -234,15 +240,21 @@ export const UserIcon = () => (
 
 // Additional useful icons you might need
 
-export const CalendarIcon = () => (
+export const CalendarIcon = ({
+  size = 24,
+  width,
+  height,
+  ...props
+}: IconSvgProps) => (
   <svg
     aria-hidden="true"
     fill="none"
     focusable="false"
-    height="1em"
+    height={size || height}
     role="presentation"
     viewBox="0 0 24 24"
-    width="1em"
+    width={size || width}
+    {...props}
   >
     <path
       d="M8 2V5M16 2V5M3.5 9.09H20.5M21 8.5V17C21 20 19.5 22 16 22H8C4.5 22 3 20 3 17V8.5C3 5.5 4.5 3.5 8 3.5H16C19.5 3.5 21 5.5 21 8.5Z"
@@ -261,15 +273,21 @@ export const CalendarIcon = () => (
   </svg>
 );
 
-export const LocationIcon = () => (
+export const LocationIcon = ({
+  size = 24,
+  width,
+  height,
+  ...props
+}: IconSvgProps) => (
   <svg
     aria-hidden="true"
     fill="none"
     focusable="false"
-    height="1em"
+    height={size || height}
     role="presentation"
     viewBox="0 0 24 24"
-    width="1em"
+    width={size || width}
+    {...props}
   >
     <path
       d="M12 2C8.13 2 5 5.13 5 9C5 14.25 12 22 12 22C12 22 19 14.25 19 9C19 5.13 15.87 2 12 2ZM12 11.5C10.62 11.5 9.5 10.38 9.5 9C9.5 7.62 10.62 6.5 12 6.5C13.38 6.5 14.5 7.62 14.5 9C14.5 10.38 13.38 11.5 12 11.5Z"
@@ -278,15 +296,21 @@ export const LocationIcon = () => (
   </svg>
 );
 
-export const TicketIcon = () => (
+export const TicketIcon = ({
+  size = 24,
+  width,
+  height,
+  ...props
+}: IconSvgProps) => (
   <svg
     aria-hidden="true"
     fill="none"
     focusable="false"
-    height="1em"
+    height={size || height}
     role="presentation"
     viewBox="0 0 24 24"
-    width="1em"
+    width={size || width}
+    {...props}
   >
     <path
       d="M19.5 12.5C19.5 11.12 20.62 10 22 10V9C22 5 21 4 17 4H7C3 4 2 5 2 9V9.5C3.38 9.5 4.5 10.62 4.5 12C4.5 13.38 3.38 14.5 2 14.5V15C2 19 3 20 7 20H17C21 20 22 19 22 15C20.62 15 19.5 13.88 19.5 12.5Z"
@@ -306,15 +330,21 @@ export const TicketIcon = () => (
   </svg>
 );
 
-export const HeartIcon = () => (
+export const HeartIcon = ({
+  size = 24,
+  width,
+  height,
+  ...props
+}: IconSvgProps) => (
   <svg
     aria-hidden="true"
     fill="none"
     focusable="false"
-    height="1em"
+    height={size || height}
     role="presentation"
     viewBox="0 0 24 24"
-    width="1em"
+    width={size || width}
+    {...props}
   >
     <path
       d="M12.62 20.81C12.28 20.93 11.72 20.93 11.38 20.81C8.48 19.82 2 15.69 2 8.68998C2 5.59998 4.49 3.09998 7.56 3.09998C9.38 3.09998 10.99 3.97998 12 5.33998C13.01 3.97998 14.63 3.09998 16.44 3.09998C19.51 3.09998 22 5.59998 22 8.68998C22 15.69 15.52 19.82 12.62 20.81Z"
@@ -326,15 +356,21 @@ export const HeartIcon = () => (
   </svg>
 );
 
-export const StarIcon = () => (
+export const StarIcon = ({
+  size = 24,
+  width,
+  height,
+  ...props
+}: IconSvgProps) => (
   <svg
     aria-hidden="true"
     fill="none"
     focusable="false"
-    height="1em"
+    height={size || height}
     role="presentation"
     viewBox="0 0 24 24"
-    width="1em"
+    width={size || width}
+    {...props}
   >
     <path
       d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"
@@ -343,15 +379,21 @@ export const StarIcon = () => (
   </svg>
 );
 
-export const MenuIcon = () => (
+export const MenuIcon = ({
+  size = 24,
+  width,
+  height,
+  ...props
+}: IconSvgProps) => (
   <svg
     aria-hidden="true"
     fill="none"
     focusable="false"
-    height="1em"
+    height={size || height}
     role="presentation"
     viewBox="0 0 24 24"
-    width="1em"
+    width={size || width}
+    {...props}
   >
     <path
       d="M3 12H21M3 6H21M3 18H21"
@@ -363,15 +405,21 @@ export const MenuIcon = () => (
   </svg>
 );
 
-export const CloseIcon = () => (
+export const CloseIcon = ({
+  size = 24,
+  width,
+  height,
+  ...props
+}: IconSvgProps) => (
   <svg
     aria-hidden="true"
     fill="none"
     focusable="false"
-    height="1em"
+    height={size || height}
     role="presentation"
     viewBox="0 0 24 24"
-    width="1em"
+    width={size || width}
+    {...props}
   >
     <path
       d="M18 6L6 18M6 6L18 18"
@@ -383,15 +431,21 @@ export const CloseIcon = () => (
   </svg>
 );
 
-export const ChevronDownIcon = () => (
+export const ChevronDownIcon = ({
+  size = 24,
+  width,
+  height,
+  ...props
+}: IconSvgProps) => (
   <svg
     aria-hidden="true"
     fill="none"
     focusable="false"
-    height="1em"
+    height={size || height}
     role="presentation"
     viewBox="0 0 24 24"
-    width="1em"
+    width={size || width}
+    {...props}
   >
     <path
       d="M19 9L12 16L5 9"

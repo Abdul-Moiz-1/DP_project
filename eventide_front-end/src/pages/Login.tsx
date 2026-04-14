@@ -6,7 +6,7 @@
 
 
 // src/pages/Login.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Card,
@@ -35,11 +35,17 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const from = (location.state as any)?.from?.pathname || '/';
+  const rawFrom = (location.state as any)?.from;
+  const from =
+    typeof rawFrom === "string"
+      ? rawFrom
+      : rawFrom?.pathname || "/";
 
-   if(isAuthenticated){
-    navigate(from, { replace: true });
-  }
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, navigate, from]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};

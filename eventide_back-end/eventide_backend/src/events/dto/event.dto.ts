@@ -1,5 +1,5 @@
 import { IsString, IsNotEmpty, IsDateString, IsNumber, IsArray, ValidateNested, IsOptional, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 // Nested DTOs
 export class LocationDto {
@@ -26,14 +26,22 @@ export class BaseEventDto {
   @IsString() @IsNotEmpty() description: string;
   @IsDateString() startDate: string;
   @IsDateString() endDate: string;
+  @Transform(({ value }) => Number(value))
   @IsNumber() @Min(1) capacity: number;
 }
 
 // Create Event
 export class CreateEventDto extends BaseEventDto {
+  @Transform(({ value }) => { try { return typeof value === 'string' ? JSON.parse(value) : value; } catch { return value; } })
   @ValidateNested() @Type(() => LocationDto) location: LocationDto;
+  
+  @Transform(({ value }) => { try { return typeof value === 'string' ? JSON.parse(value) : value; } catch { return value; } })
   @IsOptional() @IsArray() @IsString({ each: true }) imageUrls?: string[];
+  
+  @Transform(({ value }) => { try { return typeof value === 'string' ? JSON.parse(value) : value; } catch { return value; } })
   @IsArray() @ValidateNested({ each: true }) @Type(() => TicketDto) tickets: TicketDto[];
+  
+  @Transform(({ value }) => { try { return typeof value === 'string' ? JSON.parse(value) : value; } catch { return value; } })
   @IsOptional() @IsArray() @IsNumber({}, { each: true }) categoryIds?: number[];
 }
 
@@ -43,11 +51,23 @@ export class UpdateEventDto {
   @IsOptional() @IsString() description?: string;
   @IsOptional() @IsDateString() startDate?: string;
   @IsOptional() @IsDateString() endDate?: string;
-  @IsOptional() @IsNumber() @Min(1) capacity?: number;
-  @IsOptional() @ValidateNested() @Type(() => LocationDto) location?: LocationDto;
-  @IsOptional() @IsArray() @IsString({ each: true }) imageUrls?: string[];
-  @IsOptional() @IsArray() @IsNumber({}, { each: true }) categoryIds?: number[];
-  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => TicketDto) tickets: TicketDto[];
+  @IsOptional() @Transform(({ value }) => Number(value)) @IsNumber() @Min(1) capacity?: number;
+  
+  @IsOptional() 
+  @Transform(({ value }) => { try { return typeof value === 'string' ? JSON.parse(value) : value; } catch { return value; } })
+  @ValidateNested() @Type(() => LocationDto) location?: LocationDto;
+  
+  @IsOptional() 
+  @Transform(({ value }) => { try { return typeof value === 'string' ? JSON.parse(value) : value; } catch { return value; } })
+  @IsArray() @IsString({ each: true }) imageUrls?: string[];
+  
+  @IsOptional() 
+  @Transform(({ value }) => { try { return typeof value === 'string' ? JSON.parse(value) : value; } catch { return value; } })
+  @IsArray() @IsNumber({}, { each: true }) categoryIds?: number[];
+  
+  @IsOptional() 
+  @Transform(({ value }) => { try { return typeof value === 'string' ? JSON.parse(value) : value; } catch { return value; } })
+  @IsArray() @ValidateNested({ each: true }) @Type(() => TicketDto) tickets: TicketDto[];
 
 }
 
@@ -94,4 +114,7 @@ export class EventResponseDto {
   bookings?: number
   categories: { id: number; name: string }[];
   createdAt: Date;
+  recommendationScore?: number;
+  recommendationReasons?: string[];
+  distanceKm?: number;
 }

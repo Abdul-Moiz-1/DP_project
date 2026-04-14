@@ -19,6 +19,10 @@ import {
   ModalBody,
   ModalFooter,
   Input,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
 } from "@heroui/react";
 import { useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
@@ -79,14 +83,26 @@ export default function DashboardEvents() {
     }
   };
 
-  const getEventStatus = (event: Event) => {
-    const now = new Date();
-    const start = new Date(event.startDate);
-    const end = new Date(event.endDate);
-    if (now < start) return { label: "Upcoming", color: "primary" as const };
-    if (now >= start && now <= end)
-      return { label: "Ongoing", color: "success" as const };
-    return { label: "Past", color: "default" as const };
+  const handleStatusChange = async (eventId: number, newStatus: string) => {
+    try {
+      await eventService.updateEventStatus(eventId, newStatus);
+      setEvents((prev) =>
+        prev.map((e) => (e.id === eventId ? { ...e, status: newStatus } : e))
+      );
+      success("Event status updated");
+    } catch (error: any) {
+      warning(error.response?.data?.message || "Failed to update status");
+    }
+  };
+
+  const getEventStatusStyle = (status: string) => {
+    switch (status) {
+      case "PUBLISHED": return "success";
+      case "DRAFT": return "warning";
+      case "CANCELLED": return "danger";
+      case "COMPLETED": return "default";
+      default: return "default";
+    }
   };
 
   const filteredEvents = events.filter((event) =>
@@ -195,7 +211,6 @@ export default function DashboardEvents() {
               </TableHeader>
               <TableBody>
                 {filteredEvents.map((event) => {
-                  const status = getEventStatus(event);
                   return (
                     <TableRow key={event.id}>
                       <TableCell>
@@ -273,9 +288,26 @@ export default function DashboardEvents() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Chip size="sm" color={status.color} variant="flat">
-                          {status.label}
-                        </Chip>
+                        <Dropdown>
+                          <DropdownTrigger>
+                            <Chip 
+                              size="sm" 
+                              color={getEventStatusStyle(event.status || 'DRAFT') as any} 
+                              variant="flat"
+                              className="cursor-pointer hover:opacity-80 transition-opacity"
+                            >
+                              {event.status || 'DRAFT'}
+                            </Chip>
+                          </DropdownTrigger>
+                          <DropdownMenu 
+                            aria-label="Event status actions"
+                            onAction={(key) => handleStatusChange(event.id, key as string)}
+                          >
+                            <DropdownItem key="PUBLISHED">Publish</DropdownItem>
+                            <DropdownItem key="DRAFT">Set as Draft</DropdownItem>
+                            <DropdownItem key="CANCELLED" className="text-danger" color="danger">Cancel Event</DropdownItem>
+                          </DropdownMenu>
+                        </Dropdown>
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">

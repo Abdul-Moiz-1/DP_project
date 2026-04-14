@@ -137,7 +137,7 @@ const OrganizerDashboard = ({ user, stats, events }: OrganizerDashboardProps) =>
                         <TableCell>
                           <div className="flex gap-2">
                             <Button as={Link} to={`/events/${event.id}`} size="sm" variant="light">View</Button>
-                            <Button as={Link} to={`/dashboard/events/edit/${event.id}`} size="sm" variant="bordered">Edit</Button>
+                            <Button as={Link} to={`/dashboard/event/${event.id}`} size="sm" variant="bordered">Edit</Button>
                           </div>
                         </TableCell>
                       </TableRow>

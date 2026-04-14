@@ -2,7 +2,7 @@
 
 
 // src/pages/Register.tsx - SIMPLIFIED VERSION
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardHeader, CardBody, CardFooter, Button, Progress } from '@heroui/react';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,10 +20,11 @@ const Register = () => {
   const { register, isAuthenticated } = useAuth();
 
 
-  if(isAuthenticated){
-    navigate('/');
-  }
-
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/');
+    }
+  }, [isAuthenticated, navigate]);
   const initialRole = searchParams.get('type') === 'organizer' ? UserRole.ORGANIZER : UserRole.USER;
 
   const [step, setStep] = useState(1);

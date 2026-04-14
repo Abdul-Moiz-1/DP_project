@@ -5,6 +5,8 @@ export interface LocationDto {
   state: string
   country: string
   postalCode: string
+  latitude?: number
+  longitude?: number
   googleMapsLink?: string
 }
 
@@ -62,7 +64,7 @@ export interface EventResponseDto {
   images: { id: number; imageUrl: string }[]
   tickets: { id: number; name: string; price: number; salesStartDate: Date | string; salesEndDate: Date | string }[]
   categories: { id: number; name: string }[]
-  bookings: number,
+  bookings?: number | null,
   createdAt: Date
 }
 
