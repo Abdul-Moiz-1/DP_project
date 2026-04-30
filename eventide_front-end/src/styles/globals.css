@@ -7,6 +7,19 @@
 html { font-size: 16px; -webkit-font-smoothing: antialiased; }
 body { @apply bg-background text-foreground font-sans; }
 
+input[type="date"]::-webkit-datetime-edit {
+  color: #1f2937;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0.85;
+}
+
+input[type="date"]:invalid::-webkit-datetime-edit,
+input[type="date"][value=""]::-webkit-datetime-edit {
+  color: #9ca3af;
+}
+
 /* ── Heading font ── */
 h1, h2, h3, h4, h5, h6 { @apply font-display; }
 
@@ -55,3 +68,17 @@ h1, h2, h3, h4, h5, h6 { @apply font-display; }
   z-index: 1;
 }
 .maplibregl-popup-close-button:hover { color: #1a1a1a; background: transparent; }
+
+.maplibre-premium-popup .maplibregl-popup-content {
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(18px);
+}
+
+.dark .maplibre-premium-popup .maplibregl-popup-content {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(20, 20, 30, 0.92);
+  box-shadow: 0 18px 45px rgba(2, 6, 23, 0.4);
+}

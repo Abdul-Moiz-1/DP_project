@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { Button, Input, Spinner, Card, CardBody } from '@heroui/react';
-import { Crosshair, MapPin, Search } from 'lucide-react';
+import { Button, Input, Card, CardBody } from '@heroui/react';
+import { Crosshair, MapPin, Sparkles } from 'lucide-react';
 import { MapComponent } from './MapComponent';
 
 interface InteractiveLocationPickerProps {
@@ -41,7 +41,6 @@ export const InteractiveLocationPicker: React.FC<InteractiveLocationPickerProps>
           setLoading(false);
         },
         () => {
-          console.error('Geolocation error');
           setLoading(false);
         },
       );
@@ -83,17 +82,21 @@ export const InteractiveLocationPicker: React.FC<InteractiveLocationPickerProps>
   );
 
   return (
-    <Card className="border border-default-200 bg-content2">
-      <CardBody className="gap-4 px-6 py-6">
+    <Card className="overflow-hidden border border-divider bg-content1 shadow-card">
+      <CardBody className="gap-5 px-6 py-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <MapPin size={18} className="text-primary" />
-            <h3 className="text-sm font-semibold">Pick Location</h3>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <MapPin size={18} />
+            </div>
+            <div>
+              <h3 className="font-display text-base font-semibold text-foreground">Pin Your Venue</h3>
+              <p className="text-sm text-default-500">Click the map or use your current position for precise placement.</p>
+            </div>
           </div>
           <Button
             size="sm"
-            variant="flat"
             color="primary"
             onPress={handleGetCurrentLocation}
             isLoading={loading}
@@ -103,28 +106,39 @@ export const InteractiveLocationPicker: React.FC<InteractiveLocationPickerProps>
           </Button>
         </div>
 
-        {/* Map */}
+        <div className="rounded-3xl border border-divider bg-default-50/70 p-3">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <Sparkles size={14} className="text-primary" />
+              Live map preview
+            </div>
+            <div className="rounded-full bg-background/80 px-3 py-1 text-xs text-default-500 backdrop-blur">
+              Click to reposition
+            </div>
+          </div>
+
         <MapComponent
           center={[latitude || 51.505, longitude || -0.09]}
-          zoom={13}
-          height="300px"
+          zoom={14}
+          height="340px"
           markers={[
             {
               position: [latitude || 51.505, longitude || -0.09],
               label: 'Event Location',
               color: 'red',
-              popup: 'Click map to move marker',
+              popup: addressLabel || 'Click the map to place your event marker',
             },
           ]}
           onMapClick={handleMapClick}
           interactive
         />
+        </div>
 
         {/* Current Location Display */}
         {addressLabel && (
-          <div className="rounded-lg border border-default-200 bg-background px-3 py-2">
-            <p className="text-xs font-medium text-default-400">Selected Location:</p>
-            <p className="text-sm text-foreground">{addressLabel}</p>
+          <div className="rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-primary/80">Selected Location</p>
+            <p className="mt-1 text-sm text-foreground">{addressLabel}</p>
           </div>
         )}
 
@@ -138,6 +152,9 @@ export const InteractiveLocationPicker: React.FC<InteractiveLocationPickerProps>
             step="0.0001"
             size="sm"
             variant="bordered"
+            classNames={{
+              inputWrapper: 'border border-divider bg-content1 shadow-none',
+            }}
           />
           <Input
             type="number"
@@ -147,14 +164,16 @@ export const InteractiveLocationPicker: React.FC<InteractiveLocationPickerProps>
             step="0.0001"
             size="sm"
             variant="bordered"
+            classNames={{
+              inputWrapper: 'border border-divider bg-content1 shadow-none',
+            }}
           />
         </div>
 
         {/* Info */}
-        <div className="rounded-lg border border-default-100 bg-default-50 px-3 py-2">
-          <p className="text-xs text-default-500">
-            💡 Click anywhere on the map to set the location, or use the "My Location" button to get your current
-            position
+        <div className="rounded-2xl border border-divider bg-default-50 px-4 py-3">
+          <p className="text-xs leading-relaxed text-default-500">
+            Use the map for precise placement, then fine-tune the written address fields above if needed.
           </p>
         </div>
       </CardBody>

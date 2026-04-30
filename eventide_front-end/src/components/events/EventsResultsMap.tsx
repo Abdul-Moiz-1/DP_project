@@ -117,7 +117,7 @@ export default function EventsResultsMap({ events, className }: EventsResultsMap
   const defaultCenter = geojson.features[0].geometry.coordinates as [number, number];
 
   return (
-    <div className={`overflow-hidden rounded-xl border border-divider ${className ?? "h-[480px]"}`}>
+    <div className={`overflow-hidden rounded-[24px] border border-divider bg-content1 shadow-card ${className ?? "h-[480px]"}`}>
       <Map
         ref={mapRef}
         initialViewState={{
@@ -134,6 +134,7 @@ export default function EventsResultsMap({ events, className }: EventsResultsMap
         onClick={handleClick}
         attributionControl={false}
       >
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-gradient-to-b from-black/10 to-transparent dark:from-black/30" />
         <Source
           id="events"
           type="geojson"
@@ -160,6 +161,7 @@ export default function EventsResultsMap({ events, className }: EventsResultsMap
               "circle-stroke-width": 2,
               "circle-stroke-color": "#ffffff",
               "circle-opacity": 0.9,
+              "circle-blur": 0.1,
             }}
           />
 
@@ -188,6 +190,7 @@ export default function EventsResultsMap({ events, className }: EventsResultsMap
               "circle-stroke-width": 2.5,
               "circle-stroke-color": "#ffffff",
               "circle-opacity": 0.9,
+              "circle-blur": 0.05,
             }}
           />
         </Source>

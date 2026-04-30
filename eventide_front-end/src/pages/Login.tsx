@@ -35,7 +35,9 @@ const Login = () => {
 
   const handleChange = (field: string, value: string | boolean) => {
     setFormData((p) => ({ ...p, [field]: value }));
-    if (errors[field]) setErrors((p) => ({ ...p, [field]: '' }));
+    if (errors[field] || errors.submit) {
+      setErrors((p) => ({ ...p, [field]: '', submit: '' }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

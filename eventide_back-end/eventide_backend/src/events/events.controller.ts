@@ -43,6 +43,14 @@ export class EventsController {
   @UseInterceptors(FilesInterceptor('files', 5))
   create(
     @Body() dto: CreateEventDto,
+    @Body('name') rawName: string,
+    @Body('description') rawDescription: string,
+    @Body('startDate') rawStartDate: string,
+    @Body('endDate') rawEndDate: string,
+    @Body('capacity') rawCapacity: string,
+    @Body('location') rawLocation: string,
+    @Body('tickets') rawTickets: string,
+    @Body('categoryIds') rawCategoryIds: string,
     @GetUser('userId') userId: number,
     @UploadedFiles(
       new FilesValidationPipe({
@@ -50,10 +58,19 @@ export class EventsController {
         allowedTypes: ['image/png', 'image/jpeg'],
         requireFilesInEachField: false,
       }),
-    )
-    files: Express.Multer.File[],
+  )
+  files: Express.Multer.File[],
   ): Promise<EventResponseDto> {
-    return this.eventsService.create(dto, userId, files);
+    return this.eventsService.create(dto, userId, files, {
+      name: rawName,
+      description: rawDescription,
+      startDate: rawStartDate,
+      endDate: rawEndDate,
+      capacity: rawCapacity,
+      location: rawLocation,
+      tickets: rawTickets,
+      categoryIds: rawCategoryIds,
+    });
   }
 
   @Get()
@@ -107,7 +124,6 @@ export class EventsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Role(UserRole.ORGANIZER)
   getOrganizerStats(@GetUser('userId') userId: number) {
-    console.log('user id', userId);
     return this.eventsService.getOrganizerStats(userId);
   }
 
@@ -165,6 +181,15 @@ export class EventsController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateEventDto,
+    @Body('name') rawName: string,
+    @Body('description') rawDescription: string,
+    @Body('startDate') rawStartDate: string,
+    @Body('endDate') rawEndDate: string,
+    @Body('capacity') rawCapacity: string,
+    @Body('location') rawLocation: string,
+    @Body('tickets') rawTickets: string,
+    @Body('categoryIds') rawCategoryIds: string,
+    @Body('imageUrls') rawImageUrls: string,
     @GetUser('userId') userId: number,
     @UploadedFiles(
       new FilesValidationPipe({
@@ -172,10 +197,20 @@ export class EventsController {
         allowedTypes: ['image/png', 'image/jpeg'],
         requireFilesInEachField: false,
       }),
-    )
-    files?: Express.Multer.File[],
+  )
+  files?: Express.Multer.File[],
   ): Promise<EventResponseDto> {
-    return this.eventsService.update(id, dto, userId, files);
+    return this.eventsService.update(id, dto, userId, files, {
+      name: rawName,
+      description: rawDescription,
+      startDate: rawStartDate,
+      endDate: rawEndDate,
+      capacity: rawCapacity,
+      location: rawLocation,
+      tickets: rawTickets,
+      categoryIds: rawCategoryIds,
+      imageUrls: rawImageUrls,
+    });
   }
 
   @Patch(':id/status')

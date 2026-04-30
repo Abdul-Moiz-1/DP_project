@@ -1,4 +1,12 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+  Logger,
+  HttpException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Event, EventStatus } from '../entities/event.entity';
@@ -18,6 +26,110 @@ import { Follow } from 'src/entities/follow.entity';
 export class EventsService {
   private readonly logger = new Logger(EventsService.name);
 
+  private parseJsonField<T>(value: unknown, fallback: T): T {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value) as T;
+      } catch {
+        return fallback;
+      }
+    }
+
+    if (value === undefined || value === null) {
+      return fallback;
+    }
+
+    return value as T;
+  }
+
+  private getStringValue(...values: unknown[]) {
+    for (const value of values) {
+      if (typeof value === 'string' && value.trim().length > 0) {
+        return value.trim();
+      }
+    }
+
+    return '';
+  }
+
+  private getNumberValue(...values: unknown[]) {
+    for (const value of values) {
+      if (typeof value === 'number' && !Number.isNaN(value)) {
+        return value;
+      }
+
+      if (typeof value === 'string' && value.trim().length > 0) {
+        const parsed = Number(value);
+        if (!Number.isNaN(parsed)) return parsed;
+      }
+    }
+
+    return undefined;
+  }
+
+  private getDateValue(label: string, ...values: unknown[]) {
+    const rawValue = this.getStringValue(...values);
+    const date = new Date(rawValue);
+
+    if (!rawValue || Number.isNaN(date.getTime())) {
+      throw new BadRequestException(`Invalid ${label}`);
+    }
+
+    return { raw: rawValue, date };
+  }
+
+  private normalizeTicketsPayload(tickets: unknown) {
+    const parsedTickets = this.parseJsonField<unknown[]>(tickets, Array.isArray(tickets) ? (tickets as unknown[]) : []);
+    if (!Array.isArray(parsedTickets) || parsedTickets.length === 0) {
+      throw new BadRequestException('At least one ticket type is required');
+    }
+
+    return parsedTickets.map((ticket, index) => {
+      if (!ticket || typeof ticket !== 'object') {
+        throw new BadRequestException(`Ticket ${index + 1} is invalid`);
+      }
+
+      const ticketRecord = ticket as Record<string, unknown>;
+      const name = this.getStringValue(ticketRecord.name);
+      const price = this.getNumberValue(ticketRecord.price);
+      const salesStart = this.getDateValue(`ticket ${index + 1} salesStartDate`, ticketRecord.salesStartDate);
+      const salesEnd = this.getDateValue(`ticket ${index + 1} salesEndDate`, ticketRecord.salesEndDate);
+
+      if (!name) {
+        throw new BadRequestException(`Ticket ${index + 1} name is required`);
+      }
+      if (price === undefined || price < 0) {
+        throw new BadRequestException(`Ticket "${name}": price must be 0 or greater`);
+      }
+      if (salesStart.date >= salesEnd.date) {
+        throw new BadRequestException(`Ticket "${name}": Sales end date must be after start date`);
+      }
+
+      return {
+        name,
+        price,
+        salesStartDate: salesStart.raw,
+        salesEndDate: salesEnd.raw,
+      };
+    });
+  }
+
+  private normalizeCategoryIds(categoryIds: unknown) {
+    const parsed = this.parseJsonField<unknown[]>(categoryIds, Array.isArray(categoryIds) ? (categoryIds as unknown[]) : []);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((item) => Number(item))
+      .filter((item) => !Number.isNaN(item));
+  }
+
+  private normalizeImageUrls(imageUrls: unknown) {
+    const parsed = this.parseJsonField<unknown[]>(imageUrls, Array.isArray(imageUrls) ? (imageUrls as unknown[]) : []);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  }
+
   constructor(
     @InjectRepository(Event) private eventRepo: Repository<Event>,
     @InjectRepository(EventLocation) private locationRepo: Repository<EventLocation>,
@@ -32,8 +144,148 @@ export class EventsService {
     private readonly geocodingService: GeocodingService,
   ) { }
 
+  private normalizeLocationPayload(location: CreateEventDto['location'] | UpdateEventDto['location'] | string | unknown) {
+    if (!location) {
+      throw new BadRequestException('Location details are required');
+    }
 
-  async create(dto: CreateEventDto, userId: number, files?: Express.Multer.File[]): Promise<EventResponseDto> {
+    let parsedLocation = location;
+    if (typeof parsedLocation === 'string') {
+      try {
+        parsedLocation = JSON.parse(parsedLocation);
+      } catch {
+        throw new BadRequestException('Location payload is invalid');
+      }
+    }
+
+    if (!parsedLocation || typeof parsedLocation !== 'object') {
+      throw new BadRequestException('Location payload is invalid');
+    }
+
+    const locationObject = parsedLocation as Record<string, unknown>;
+
+    const normalized = {
+      address: typeof locationObject.address === 'string' ? locationObject.address.trim() : '',
+      city: typeof locationObject.city === 'string' ? locationObject.city.trim() : '',
+      state: typeof locationObject.state === 'string' ? locationObject.state.trim() : '',
+      country: typeof locationObject.country === 'string' ? locationObject.country.trim() : '',
+      postalCode: typeof locationObject.postalCode === 'string' ? locationObject.postalCode.trim() : '',
+      latitude: typeof locationObject.latitude === 'number' ? locationObject.latitude : undefined,
+      longitude: typeof locationObject.longitude === 'number' ? locationObject.longitude : undefined,
+      googleMapsLink: typeof locationObject.googleMapsLink === 'string' ? locationObject.googleMapsLink.trim() : undefined,
+    };
+
+    if (!normalized.address || !normalized.city || !normalized.state || !normalized.country || !normalized.postalCode) {
+      const missingFields = [
+        !normalized.address ? 'address' : null,
+        !normalized.city ? 'city' : null,
+        !normalized.state ? 'state' : null,
+        !normalized.country ? 'country' : null,
+        !normalized.postalCode ? 'postalCode' : null,
+      ].filter(Boolean);
+
+      throw new BadRequestException(`Complete location details are required. Missing: ${missingFields.join(', ')}`);
+    }
+
+    return normalized;
+  }
+
+  private hasMeaningfulLocation(location: unknown) {
+    if (!location || typeof location !== 'object') return false;
+
+    const locationObject = location as Record<string, unknown>;
+    return ['address', 'city', 'state', 'country', 'postalCode'].some((field) => {
+      const value = locationObject[field];
+      return typeof value === 'string' && value.trim().length > 0;
+    });
+  }
+
+  private normalizeCreatePayload(
+    dto: CreateEventDto,
+    raw: {
+      name?: string;
+      description?: string;
+      startDate?: string;
+      endDate?: string;
+      capacity?: string;
+      location?: string;
+      tickets?: string;
+      categoryIds?: string;
+    },
+  ) {
+    const name = this.getStringValue(raw.name, dto.name);
+    const description = this.getStringValue(raw.description, dto.description);
+    const startDate = this.getDateValue('startDate', raw.startDate, dto.startDate);
+    const endDate = this.getDateValue('endDate', raw.endDate, dto.endDate);
+    const capacity = this.getNumberValue(raw.capacity, dto.capacity);
+    const location = this.normalizeLocationPayload(this.hasMeaningfulLocation(dto.location) ? dto.location : raw.location);
+    const tickets = this.normalizeTicketsPayload(raw.tickets ?? dto.tickets);
+    const categoryIds = this.normalizeCategoryIds(raw.categoryIds ?? dto.categoryIds);
+    const imageUrls = this.normalizeImageUrls(dto.imageUrls);
+
+    if (!name) throw new BadRequestException('Event name is required');
+    if (!description) throw new BadRequestException('Description is required');
+    if (capacity === undefined || capacity < 1) {
+      throw new BadRequestException('Capacity must be at least 1');
+    }
+
+    return {
+      name,
+      description,
+      startDate,
+      endDate,
+      capacity,
+      location,
+      tickets,
+      categoryIds,
+      imageUrls,
+    };
+  }
+
+  private normalizeUpdatePayload(
+    dto: UpdateEventDto,
+    raw: {
+      name?: string;
+      description?: string;
+      startDate?: string;
+      endDate?: string;
+      capacity?: string;
+      location?: string;
+      tickets?: string;
+      categoryIds?: string;
+      imageUrls?: string;
+    },
+  ) {
+    return {
+      name: this.getStringValue(raw.name, dto.name) || undefined,
+      description: this.getStringValue(raw.description, dto.description) || undefined,
+      startDate: this.getStringValue(raw.startDate, dto.startDate) || undefined,
+      endDate: this.getStringValue(raw.endDate, dto.endDate) || undefined,
+      capacity: this.getNumberValue(raw.capacity, dto.capacity),
+      hasLocation: this.hasMeaningfulLocation(dto.location) || Boolean(raw.location),
+      location: this.hasMeaningfulLocation(dto.location) ? dto.location : raw.location,
+      tickets: raw.tickets !== undefined || dto.tickets ? this.normalizeTicketsPayload(raw.tickets ?? dto.tickets) : undefined,
+      categoryIds: raw.categoryIds !== undefined || dto.categoryIds ? this.normalizeCategoryIds(raw.categoryIds ?? dto.categoryIds) : undefined,
+      imageUrls: raw.imageUrls !== undefined || dto.imageUrls !== undefined ? this.normalizeImageUrls(raw.imageUrls ?? dto.imageUrls) : undefined,
+    };
+  }
+
+
+  async create(
+    dto: CreateEventDto,
+    userId: number,
+    files?: Express.Multer.File[],
+    raw?: {
+      name?: string;
+      description?: string;
+      startDate?: string;
+      endDate?: string;
+      capacity?: string;
+      location?: string;
+      tickets?: string;
+      categoryIds?: string;
+    },
+  ): Promise<EventResponseDto> {
     if (!userId) throw new BadRequestException('Invalid user ID');
     if (!dto) throw new BadRequestException('Event data is required');
 
@@ -48,12 +300,10 @@ export class EventsService {
     }
 
     // Validate dates
-    const startDate = new Date(dto.startDate);
-    const endDate = new Date(dto.endDate);
+    const payload = this.normalizeCreatePayload(dto, raw || {});
+    const startDate = payload.startDate.date;
+    const endDate = payload.endDate.date;
 
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-      throw new BadRequestException('Invalid date format');
-    }
     if (startDate >= endDate) {
       throw new BadRequestException('End date must be after start date');
     }
@@ -62,12 +312,7 @@ export class EventsService {
     }
 
     // Validate tickets
-    if (!dto.tickets || dto.tickets.length === 0) {
-      throw new BadRequestException('At least one ticket type is required');
-    }
-
-    // Validate ticket dates
-    for (const ticketDto of dto.tickets) {
+    for (const ticketDto of payload.tickets) {
       const salesStart = new Date(ticketDto.salesStartDate);
       const salesEnd = new Date(ticketDto.salesEndDate);
 
@@ -80,7 +325,7 @@ export class EventsService {
     }
 
     try {
-      const locationData = { ...dto.location };
+      const locationData = payload.location;
       if (locationData.latitude == null || locationData.longitude == null) {
         const coords = await this.geocodingService.geocodeAddress(
           locationData.address, locationData.city, locationData.country,
@@ -93,55 +338,37 @@ export class EventsService {
       const location = await this.locationRepo.save(this.locationRepo.create(locationData));
 
       let categories: Category[] = [];
-      if (dto.categoryIds && dto.categoryIds.length > 0) {
-        categories = await this.categoryRepo.findBy({ id: In(dto.categoryIds) });
-        if (categories.length !== dto.categoryIds.length) {
+      if (payload.categoryIds.length > 0) {
+        categories = await this.categoryRepo.findBy({ id: In(payload.categoryIds) });
+        if (categories.length !== payload.categoryIds.length) {
           throw new BadRequestException('One or more categories not found');
         }
       }
 
       const event = await this.eventRepo.save(
         this.eventRepo.create({
-          name: dto.name,
-          description: dto.description,
+          name: payload.name,
+          description: payload.description,
           startDate,
           endDate,
-          capacity: dto.capacity,
+          capacity: payload.capacity,
           organizer,
           location,
           categories,
         })
       );
 
-      console.log("event created:", event.id);
-
       if (files && files.length > 0) {
-        console.log("uploading files:", files.length);
-        files.forEach((f, i) => {
-          console.log(`  File ${i}:`, {
-            fieldname: f.fieldname,
-            originalname: f.originalname,
-            encoding: f.encoding,
-            mimetype: f.mimetype,
-            size: f.size,
-            destination: f.destination,
-            filename: f.filename,
-            path: f.path,
-          });
-        });
-        const uploadedFiles = this.uploadService.uploadMany(files);
-        console.log("uploaded files urls:", uploadedFiles);
-        dto.imageUrls = [...(dto.imageUrls || []), ...uploadedFiles];
+        const uploadedFiles = await this.uploadService.uploadMany(files);
+        payload.imageUrls.push(...uploadedFiles);
       }
 
-      if (dto.imageUrls && dto.imageUrls.length > 0) {
-        console.log("saving images:", dto.imageUrls);
-        const images = dto.imageUrls.map(url => this.imageRepo.create({ imageUrl: url, event }));
+      if (payload.imageUrls.length > 0) {
+        const images = payload.imageUrls.map(url => this.imageRepo.create({ imageUrl: url, event }));
         await this.imageRepo.save(images);
       }
 
-      console.log("creating tickets:", dto.tickets);
-      const tickets = dto.tickets.map(t =>
+      const tickets = payload.tickets.map(t =>
         this.ticketRepo.create({
           name: t.name,
           price: t.price,
@@ -151,20 +378,15 @@ export class EventsService {
         })
       );
 
-      console.log("saving tickets...");
       await this.ticketRepo.save(tickets);
 
-      console.log("finding created event with id:", event.id);
       return this.findOne(event.id);
     } catch (error) {
-      this.logger.error("Event creation error:", error);
-      if (error instanceof BadRequestException || error instanceof NotFoundException) {
-        throw error;
-      }
-      // Extract error message for better debugging
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      this.logger.error(`Event creation failed: ${errorMessage}`, error);
-      throw new BadRequestException(`Failed to create event: ${errorMessage}`);
+      this.logger.error('Failed to create event', error instanceof Error ? error.stack : undefined);
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException(
+        `Failed to create event: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
   }
 
@@ -271,7 +493,23 @@ export class EventsService {
   }
 
 
-  async update(id: number, dto: UpdateEventDto, userId: number, files?: Express.Multer.File[]): Promise<EventResponseDto> {
+  async update(
+    id: number,
+    dto: UpdateEventDto,
+    userId: number,
+    files?: Express.Multer.File[],
+    raw?: {
+      name?: string;
+      description?: string;
+      startDate?: string;
+      endDate?: string;
+      capacity?: string;
+      location?: string;
+      tickets?: string;
+      categoryIds?: string;
+      imageUrls?: string;
+    },
+  ): Promise<EventResponseDto> {
     if (!id || id < 1) throw new BadRequestException('Invalid event ID');
     if (!userId) throw new BadRequestException('Invalid user ID');
     if (!dto || Object.keys(dto).length === 0) {
@@ -288,15 +526,17 @@ export class EventsService {
     if (!event) throw new NotFoundException('Event not found');
     if (event.organizer.id !== userId) throw new ForbiddenException('Access denied');
 
+    const payload = this.normalizeUpdatePayload(dto, raw || {});
+
     // Check if event has started (can't update past/ongoing events)
     if (new Date() >= event.startDate) {
       throw new BadRequestException('Cannot update events that have started or ended');
     }
 
     // Validate and update dates
-    if (dto.startDate || dto.endDate) {
-      const startDate = dto.startDate ? new Date(dto.startDate) : event.startDate;
-      const endDate = dto.endDate ? new Date(dto.endDate) : event.endDate;
+    if (payload.startDate || payload.endDate) {
+      const startDate = payload.startDate ? new Date(payload.startDate) : event.startDate;
+      const endDate = payload.endDate ? new Date(payload.endDate) : event.endDate;
 
       if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
         throw new BadRequestException('Invalid date format');
@@ -313,13 +553,13 @@ export class EventsService {
     }
 
     // Update basic fields
-    if (dto.name) event.name = dto.name;
-    if (dto.description) event.description = dto.description;
-    if (dto.capacity) event.capacity = dto.capacity;
+    if (payload.name) event.name = payload.name;
+    if (payload.description) event.description = payload.description;
+    if (payload.capacity !== undefined) event.capacity = payload.capacity;
 
     // Update location
-    if (dto.location) {
-      const nextLocation = { ...event.location, ...dto.location };
+    if (payload.hasLocation) {
+      const nextLocation = this.normalizeLocationPayload({ ...event.location, ...this.normalizeLocationPayload(payload.location) });
 
       if (nextLocation.latitude == null || nextLocation.longitude == null) {
         const coords = await this.geocodingService.geocodeAddress(
@@ -337,9 +577,9 @@ export class EventsService {
     }
 
     // Update categories
-    if (dto.categoryIds && dto.categoryIds.length > 0) {
-      const categories = await this.categoryRepo.findBy({ id: In(dto.categoryIds) });
-      if (categories.length !== dto.categoryIds.length) {
+    if (payload.categoryIds && payload.categoryIds.length > 0) {
+      const categories = await this.categoryRepo.findBy({ id: In(payload.categoryIds) });
+      if (categories.length !== payload.categoryIds.length) {
         throw new BadRequestException('One or more categories not found');
       }
       event.categories = categories;
@@ -347,40 +587,36 @@ export class EventsService {
 
     // Handle new uploaded files (merge with existing retained images)
     if (files && files.length > 0) {
-      const uploadedFiles = this.uploadService.uploadMany(files);
+      const uploadedFiles = await this.uploadService.uploadMany(files);
       // Merge existing retained images with newly uploaded files
-      const existingImages = dto.imageUrls ? [...dto.imageUrls] : [];
-      dto.imageUrls = [...existingImages, ...uploadedFiles];
-      console.log("Images after merge:", dto.imageUrls);
+      const existingImages = payload.imageUrls ? [...payload.imageUrls] : [];
+      payload.imageUrls = [...existingImages, ...uploadedFiles];
     }
 
     // Update images (only if imageUrls was explicitly sent in the request)
-    if (dto.imageUrls !== undefined) {
-      console.log("Updating images with:", dto.imageUrls);
+    if (payload.imageUrls !== undefined) {
       await this.imageRepo.delete({ event: { id } });
-      if (dto.imageUrls.length > 0) {
-        const images = dto.imageUrls.map(url => this.imageRepo.create({ imageUrl: url, event }));
+      if (payload.imageUrls.length > 0) {
+        const images = payload.imageUrls.map(url => this.imageRepo.create({ imageUrl: url, event }));
         await this.imageRepo.save(images);
-        console.log("Saved images:", images.length);
       }
     }
 
     // Update tickets (only if not restricted by bookings)
-    if (dto.tickets && dto.tickets.length > 0) {
+    if (payload.tickets && payload.tickets.length > 0) {
       // Check if there are existing confirmed bookings
       const existingBookings = await this.bookingRepo.count({
         where: { event: { id }, status: In(['CONFIRMED']) }
       });
 
       if (existingBookings > 0) {
-        console.log(`Cannot update tickets - ${existingBookings} confirmed bookings exist`);
         throw new BadRequestException('Cannot update tickets when confirmed bookings exist. Please cancel bookings first.');
       }
 
       // Delete old tickets and create new ones
       await this.ticketRepo.delete({ event: { id } });
 
-      const tickets = dto.tickets.map(t => {
+      const tickets = payload.tickets.map(t => {
         const salesStart = new Date(t.salesStartDate);
         const salesEnd = new Date(t.salesEndDate);
 

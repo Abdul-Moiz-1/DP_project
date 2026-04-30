@@ -1,15 +1,16 @@
 "use client"
 import { EventForm } from "@/components/dashboard/create-event/event-form"
-import type {CreateEventDto, UpdateEventDto} from "@/lib/dtos"
+import type { CreateEventDto, UpdateEventDto } from "@/lib/dtos"
 import { useToast } from "@/components/toast-provider"
 import { api } from "@/api/api"
 import { useNavigate } from "react-router-dom"
+import { AxiosError } from "axios"
 
 export default function CreateEventPage() {
   const { success, error } = useToast()
   const navigate = useNavigate()
 
-  const handleSubmit = async (data: CreateEventDto | UpdateEventDto) => {
+  const handleSubmit = async (data: FormData | CreateEventDto | UpdateEventDto) => {
     try {
       const response = await api.post("/events", data)
       
@@ -22,7 +23,14 @@ export default function CreateEventPage() {
         throw new Error("Failed to create event")
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "An error occurred"
+      const errorMessage =
+        err instanceof AxiosError
+          ? (Array.isArray(err.response?.data?.message)
+              ? err.response?.data?.message.join(", ")
+              : err.response?.data?.message) || err.message
+          : err instanceof Error
+            ? err.message
+            : "An error occurred"
       error(errorMessage)
       throw err
     }

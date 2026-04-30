@@ -45,6 +45,7 @@ export interface EventResponseDto {
   id: number
   name: string
   description: string
+  status?: string
   startDate: Date | string
   endDate: Date | string
   capacity: number
@@ -64,7 +65,10 @@ export interface EventResponseDto {
   images: { id: number; imageUrl: string }[]
   tickets: { id: number; name: string; price: number; salesStartDate: Date | string; salesEndDate: Date | string }[]
   categories: { id: number; name: string }[]
-  bookings?: number | null,
+  bookings?: number | null
   createdAt: Date
+  recommendationScore?: number
+  recommendationReasons?: string[]
+  distanceKm?: number
 }
 

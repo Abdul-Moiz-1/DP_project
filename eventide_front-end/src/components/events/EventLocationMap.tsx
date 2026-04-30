@@ -1,7 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Card, CardBody, CardHeader, Divider, Tabs, Tab } from '@heroui/react';
 import { MapPin } from 'lucide-react';
-import { LatLngExpression } from 'leaflet';
 import { MapComponent } from '../common/MapComponent';
 import { DirectionsPanel } from '../common/DirectionsPanel';
 
@@ -36,12 +35,12 @@ export const EventLocationMap: React.FC<EventLocationMapProps> = ({
   userLocation,
   onDirectionsLoaded,
 }) => {
-  const [polylineCoords, setPolylineCoords] = useState<LatLngExpression[] | null>(null);
+  const [polylineCoords, setPolylineCoords] = useState<[number, number][] | null>(null);
   const [routeInfo, setRouteInfo] = useState<any>(null);
 
   // Prepare markers
   const markers: Array<{
-    position: LatLngExpression;
+    position: [number, number];
     label?: string;
     color?: 'blue' | 'red' | 'green';
     popup?: string;
@@ -50,17 +49,17 @@ export const EventLocationMap: React.FC<EventLocationMapProps> = ({
   // Add event marker
   if (location.latitude && location.longitude) {
     markers.push({
-      position: [location.latitude, location.longitude] as [number, number],
+      position: [location.latitude, location.longitude],
       label: 'Event Location',
       color: 'red' as const,
-      popup: `<strong>${location.address}</strong><br/>${location.city}, ${location.country}`,
+      popup: `${location.address}, ${location.city}, ${location.country}`,
     });
   }
 
   // Add user location marker if available
   if (userLocation) {
     markers.push({
-      position: [userLocation.latitude, userLocation.longitude] as [number, number],
+      position: [userLocation.latitude, userLocation.longitude],
       label: 'Your Location',
       color: 'blue' as const,
       popup: 'Your Location',
@@ -83,8 +82,8 @@ export const EventLocationMap: React.FC<EventLocationMapProps> = ({
     [onDirectionsLoaded],
   );
 
-  const mapCenter: LatLngExpression = location.latitude && location.longitude 
-    ? [location.latitude, location.longitude] 
+  const mapCenter: [number, number] = location.latitude && location.longitude
+    ? [location.latitude, location.longitude]
     : [51.505, -0.09];
 
   return (
@@ -102,9 +101,21 @@ export const EventLocationMap: React.FC<EventLocationMapProps> = ({
         <Divider />
 
         <CardBody className="gap-4">
-          <Tabs defaultSelectedKey="map" className="w-full">
+          <Tabs
+            defaultSelectedKey="map"
+            className="w-full"
+            variant="bordered"
+            color="primary"
+            classNames={{
+              tabList: "gap-2 rounded-2xl bg-default-100/80 p-1.5",
+              cursor: "rounded-xl bg-content1 shadow-sm ring-1 ring-default-200",
+              tab: "h-11 rounded-xl px-5 text-default-500 data-[hover-unselected=true]:text-default-700",
+              tabContent: "font-medium group-data-[selected=true]:text-primary",
+              panel: "pt-4",
+            }}
+          >
             <Tab key="map" title="Map">
-              <div className="pt-4">
+              <div>
                 <MapComponent
                   center={mapCenter}
                   zoom={14}
@@ -117,7 +128,7 @@ export const EventLocationMap: React.FC<EventLocationMapProps> = ({
             </Tab>
 
             <Tab key="details" title="Information">
-              <div className="space-y-4 pt-4">
+              <div className="space-y-4">
                 {/* Address Section */}
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-default-400">Address</p>

@@ -1,198 +1,225 @@
-import React, { useEffect, useRef } from 'react';
-import L, { LatLngExpression, Map as LeafletMap } from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
+import Map, { Layer, Marker, NavigationControl, Popup, Source } from "react-map-gl/maplibre";
+import type { MapLayerMouseEvent, MapRef } from "react-map-gl/maplibre";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { MapPin } from "lucide-react";
 
-// Fix default marker icons for Leaflet
-const DefaultIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
+const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
-L.Marker.prototype.options.icon = DefaultIcon;
+type MarkerColor = "blue" | "red" | "green";
 
 interface MapComponentProps {
-  center?: LatLngExpression;
+  center?: [number, number];
   zoom?: number;
   height?: string;
   markers?: Array<{
-    position: LatLngExpression;
+    position: [number, number];
     label?: string;
-    color?: 'blue' | 'red' | 'green';
+    color?: MarkerColor;
     popup?: string;
   }>;
-  polyline?: LatLngExpression[];
+  polyline?: [number, number][];
   polylineColor?: string;
   onMapClick?: (lat: number, lng: number) => void;
   interactive?: boolean;
 }
 
-/**
- * Reusable Leaflet map component using OpenStreetMap tiles
- * Provides a foundation for both location picking and event display
- */
-export const MapComponent = React.forwardRef<LeafletMap, MapComponentProps>(
+const markerStyles: Record<MarkerColor, string> = {
+  blue: "from-sky-500 to-blue-600",
+  red: "from-rose-500 to-orange-500",
+  green: "from-emerald-500 to-teal-500",
+};
+
+export const MapComponent = forwardRef<MapRef, MapComponentProps>(
   (
     {
       center = [51.505, -0.09],
       zoom = 13,
-      height = '400px',
+      height = "400px",
       markers = [],
-      polyline: polylineCoords,
-      polylineColor = '#3b82f6',
+      polyline,
+      polylineColor = "#8b5cf6",
       onMapClick,
       interactive = true,
     },
-    ref,
+    forwardedRef,
   ) => {
-    const mapRef = useRef<HTMLDivElement>(null);
-    const mapInstanceRef = useRef<LeafletMap | null>(null);
-    const markersRef = useRef<L.Marker[]>([]);
-    const polylineRef = useRef<L.Polyline | null>(null);
+    const mapRef = useRef<MapRef | null>(null);
+    const [popupIndex, setPopupIndex] = useState<number | null>(null);
 
-    // Initialize map
+    const routeGeoJson = useMemo(
+      () =>
+        polyline && polyline.length > 1
+          ? {
+              type: "FeatureCollection" as const,
+              features: [
+                {
+                  type: "Feature" as const,
+                  geometry: {
+                    type: "LineString" as const,
+                    coordinates: polyline.map(([lat, lng]) => [lng, lat]),
+                  },
+                  properties: {},
+                },
+              ],
+            }
+          : null,
+      [polyline],
+    );
+
     useEffect(() => {
-      if (!mapRef.current || mapInstanceRef.current) return;
+      const map = mapRef.current;
+      if (!map) return;
 
-      const map = L.map(mapRef.current, {
-        center: center as L.LatLngExpression,
+      if (routeGeoJson?.features.length) {
+        const coordinates = routeGeoJson.features[0].geometry.coordinates;
+        const lngs = coordinates.map(([lng]) => lng);
+        const lats = coordinates.map(([, lat]) => lat);
+        map.fitBounds(
+          [
+            [Math.min(...lngs), Math.min(...lats)],
+            [Math.max(...lngs), Math.max(...lats)],
+          ],
+          { padding: 64, duration: 900, maxZoom: 15 },
+        );
+        return;
+      }
+
+      if (markers.length > 1) {
+        const lngs = markers.map((marker) => marker.position[1]);
+        const lats = markers.map((marker) => marker.position[0]);
+        map.fitBounds(
+          [
+            [Math.min(...lngs), Math.min(...lats)],
+            [Math.max(...lngs), Math.max(...lats)],
+          ],
+          { padding: 64, duration: 900, maxZoom: 15 },
+        );
+        return;
+      }
+
+      map.flyTo({
+        center: [center[1], center[0]],
         zoom,
-        dragging: interactive,
-        scrollWheelZoom: interactive,
-        doubleClickZoom: interactive,
-        boxZoom: interactive,
+        duration: 900,
       });
+    }, [center, zoom, markers, routeGeoJson]);
 
-      // Add OpenStreetMap tiles
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
-        maxZoom: 19,
-      }).addTo(map);
-
-      mapInstanceRef.current = map;
-
-      // Handle click events
-      if (onMapClick && interactive) {
-        map.on('click', (e) => {
-          onMapClick(e.latlng.lat, e.latlng.lng);
-        });
-      }
-
-      // Forward ref
-      if (typeof ref === 'function') {
-        ref(map);
-      } else if (ref) {
-        ref.current = map;
-      }
-
-      return () => {
-        // Don't destroy on re-render, only on unmount
-      };
-    }, []);
-
-    // Update zoom
-    useEffect(() => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.setZoom(zoom);
-      }
-    }, [zoom]);
-
-    // Update center
-    useEffect(() => {
-      if (mapInstanceRef.current && center) {
-        mapInstanceRef.current.panTo(center as L.LatLngExpression);
-      }
-    }, [center]);
-
-    // Update markers
-    useEffect(() => {
-      if (!mapInstanceRef.current) return;
-
-      // Clear old markers
-      markersRef.current.forEach((marker) => marker.remove());
-      markersRef.current = [];
-
-      // Add new markers
-      markers.forEach((markerData) => {
-        const marker = L.marker(markerData.position, {
-          icon: getColoredIcon(markerData.color || 'blue'),
-        }).addTo(mapInstanceRef.current!);
-
-        if (markerData.popup) {
-          marker.bindPopup(markerData.popup);
-        }
-
-        if (markerData.label) {
-          marker.bindTooltip(markerData.label, { permanent: false });
-        }
-
-        markersRef.current.push(marker);
-      });
-    }, [markers]);
-
-    // Update polyline
-    useEffect(() => {
-      if (!mapInstanceRef.current) return;
-
-      // Remove old polyline
-      if (polylineRef.current) {
-        polylineRef.current.remove();
-        polylineRef.current = null;
-      }
-
-      // Add new polyline
-      if (polylineCoords && polylineCoords.length > 1) {
-        polylineRef.current = L.polyline(polylineCoords as L.LatLngExpression[], {
-          color: polylineColor,
-          weight: 4,
-          opacity: 0.8,
-          lineCap: 'round',
-          lineJoin: 'round',
-        }).addTo(mapInstanceRef.current);
-
-        // Fit bounds to show entire route
-        const bounds = L.latLngBounds(polylineCoords as L.LatLngExpression[]);
-        mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50] });
-      }
-    }, [polylineCoords, polylineColor]);
+    const handleClick = (event: MapLayerMouseEvent) => {
+      if (!interactive || !onMapClick) return;
+      onMapClick(event.lngLat.lat, event.lngLat.lng);
+      setPopupIndex(null);
+    };
 
     return (
       <div
-        ref={mapRef}
-        style={{
-          height,
-          width: '100%',
-          borderRadius: '12px',
-          overflow: 'hidden',
-        }}
-      />
+        className="relative overflow-hidden rounded-[24px] border border-white/40 bg-[radial-gradient(circle_at_top,_rgba(139,92,246,0.16),_transparent_45%),linear-gradient(180deg,rgba(255,255,255,0.92),rgba(246,246,255,0.72))] shadow-[0_20px_60px_rgba(15,23,42,0.12)] dark:border-white/10 dark:bg-[radial-gradient(circle_at_top,_rgba(139,92,246,0.22),_transparent_40%),linear-gradient(180deg,rgba(16,18,27,0.96),rgba(24,24,36,0.92))]"
+        style={{ height, width: "100%" }}
+      >
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-20 bg-gradient-to-b from-black/10 to-transparent dark:from-black/25" />
+
+        <Map
+          ref={(instance) => {
+            mapRef.current = instance;
+            if (typeof forwardedRef === "function") {
+              forwardedRef(instance);
+            } else if (forwardedRef) {
+              forwardedRef.current = instance;
+            }
+          }}
+          initialViewState={{
+            longitude: center[1],
+            latitude: center[0],
+            zoom,
+          }}
+          style={{ width: "100%", height: "100%" }}
+          mapStyle={MAP_STYLE}
+          onClick={handleClick}
+          dragPan={interactive}
+          scrollZoom={interactive}
+          doubleClickZoom={interactive}
+          touchZoomRotate={interactive}
+          attributionControl={false}
+        >
+          <NavigationControl position="top-right" showCompass={interactive} visualizePitch={false} />
+
+          {routeGeoJson && (
+            <Source id="route-line" type="geojson" data={routeGeoJson}>
+              <Layer
+                id="route-glow"
+                type="line"
+                paint={{
+                  "line-color": polylineColor,
+                  "line-width": 10,
+                  "line-opacity": 0.18,
+                  "line-blur": 1.8,
+                }}
+              />
+              <Layer
+                id="route-line-main"
+                type="line"
+                paint={{
+                  "line-color": polylineColor,
+                  "line-width": 5,
+                  "line-opacity": 0.92,
+                }}
+              />
+            </Source>
+          )}
+
+          {markers.map((marker, index) => (
+            <Marker
+              key={`${marker.position[0]}-${marker.position[1]}-${index}`}
+              longitude={marker.position[1]}
+              latitude={marker.position[0]}
+              anchor="bottom"
+              onClick={(event) => {
+                event.originalEvent.stopPropagation();
+                setPopupIndex(index);
+              }}
+            >
+              <button
+                type="button"
+                aria-label={marker.label || "Map marker"}
+                className="group relative"
+              >
+                <div className={`absolute left-1/2 top-1/2 h-10 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br ${markerStyles[marker.color || "blue"]} opacity-25 blur-md transition-transform duration-300 group-hover:scale-110`} />
+                <div className={`relative flex h-11 w-11 items-center justify-center rounded-2xl border border-white/70 bg-gradient-to-br ${markerStyles[marker.color || "blue"]} text-white shadow-[0_12px_30px_rgba(59,130,246,0.35)] transition-transform duration-300 group-hover:-translate-y-0.5`}>
+                  <MapPin size={18} fill="currentColor" />
+                </div>
+              </button>
+            </Marker>
+          ))}
+
+          {popupIndex !== null && markers[popupIndex] && (
+            <Popup
+              longitude={markers[popupIndex].position[1]}
+              latitude={markers[popupIndex].position[0]}
+              anchor="top"
+              offset={18}
+              closeButton={false}
+              closeOnClick={false}
+              onClose={() => setPopupIndex(null)}
+              className="maplibre-premium-popup"
+            >
+              <div className="min-w-[180px] p-1">
+                {markers[popupIndex].label && (
+                  <p className="text-sm font-semibold text-foreground">{markers[popupIndex].label}</p>
+                )}
+                {markers[popupIndex].popup && (
+                  <p className="mt-1 text-xs leading-relaxed text-default-500">{markers[popupIndex].popup.replace(/<br\s*\/?>/g, ", ").replace(/<[^>]+>/g, "")}</p>
+                )}
+              </div>
+            </Popup>
+          )}
+        </Map>
+
+        <div className="pointer-events-none absolute bottom-4 left-4 z-10 rounded-full border border-white/50 bg-background/85 px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.24em] text-default-500 backdrop-blur-md dark:border-white/10 dark:bg-black/45">
+          Eventide Maps
+        </div>
+      </div>
     );
   },
 );
 
-MapComponent.displayName = 'MapComponent';
-
-/**
- * Get colored marker icon for different marker types
- */
-function getColoredIcon(color: 'blue' | 'red' | 'green'): L.Icon {
-  const colors: Record<string, string> = {
-    blue: '3b82f6',
-    red: 'ef4444',
-    green: '22c55e',
-  };
-
-  const colorHex = colors[color] || colors.blue;
-
-  return L.icon({
-    iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
-    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41],
-  });
-}
+MapComponent.displayName = "MapComponent";

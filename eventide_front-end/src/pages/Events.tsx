@@ -291,16 +291,32 @@ const Events = () => {
           <Input
             type="date"
             label="From"
+            labelPlacement="outside"
+            variant="bordered"
             size="sm"
             value={startDate}
             onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }}
+            classNames={{
+              label: "text-sm font-medium text-default-700",
+              inputWrapper:
+                "bg-content1 border border-default-300 shadow-none group-data-[focus=true]:border-primary group-data-[hover=true]:border-default-400",
+              input: "text-foreground",
+            }}
           />
           <Input
             type="date"
             label="To"
+            labelPlacement="outside"
+            variant="bordered"
             size="sm"
             value={endDate}
             onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }}
+            classNames={{
+              label: "text-sm font-medium text-default-700",
+              inputWrapper:
+                "bg-content1 border border-default-300 shadow-none group-data-[focus=true]:border-primary group-data-[hover=true]:border-default-400",
+              input: "text-foreground",
+            }}
           />
         </div>
       </FilterSection>
@@ -592,6 +608,13 @@ const Events = () => {
                   onChange={handlePageChange}
                   color="primary"
                   showControls
+                  classNames={{
+                    base: "gap-2",
+                    item: "bg-content1 text-default-600 border border-default-200 shadow-none data-[hover=true]:bg-default-100",
+                    cursor: "bg-primary text-white shadow-none",
+                    prev: "bg-content1 text-default-500 border border-default-200 data-[hover=true]:bg-default-100",
+                    next: "bg-content1 text-default-500 border border-default-200 data-[hover=true]:bg-default-100",
+                  }}
                 />
               </div>
             )}

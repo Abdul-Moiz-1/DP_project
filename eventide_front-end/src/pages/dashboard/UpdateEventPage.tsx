@@ -3,6 +3,7 @@ import { EventForm } from "@/components/dashboard/create-event/event-form"
 import type { EventResponseDto, UpdateEventDto } from "@/lib/dtos"
 import { useToast } from "@/components/toast-provider"
 import { api } from "@/api/api"
+import { AxiosError } from "axios"
 import React, { useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 
@@ -38,7 +39,7 @@ export default function UpdateEventPage() {
     }
   }, [eventId])
 
-  const handleSubmit = async (data: UpdateEventDto) => {
+  const handleSubmit = async (data: FormData | UpdateEventDto) => {
     if (!eventId) {
       error("No event ID provided")
       return
@@ -54,7 +55,14 @@ export default function UpdateEventPage() {
         throw new Error("Failed to update event")
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "An error occurred"
+      const errorMessage =
+        err instanceof AxiosError
+          ? (Array.isArray(err.response?.data?.message)
+              ? err.response?.data?.message.join(", ")
+              : err.response?.data?.message) || err.message
+          : err instanceof Error
+            ? err.message
+            : "An error occurred"
       error(errorMessage)
       throw err
     }

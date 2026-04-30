@@ -10,10 +10,6 @@ import { User } from "@/api/types";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/api/api";
 
-const BASE_API_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
-console.log("API Base URL:", BASE_API_URL);
-
 interface RegisterData {
   email: string;
   password: string;
@@ -101,10 +97,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const login = async (email: string, password: string) => {
     try {
       const response = await api.post("/auth/login", { email, password });
-      console.log("Login response:", response);
-      if (!response) {
-        console.log("No response from login API");
-      }
       const data: LoginResponse = response.data;
 
       localStorage.setItem("user", JSON.stringify(data.user));
@@ -113,30 +105,21 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setToken(data.accessToken);
       setIsAuthenticated(true);
     } catch (error) {
-      console.error("Login failed:", error);
-      throw new Error("Invalid email or password");
-    } finally {
-      setIsLoading(false);
+      throw error;
     }
   };
 
   const register = async (userData: RegisterData) => {
-    console.log("Registering user with data:", userData);
     try {
       const response = await api.post("/auth/register", userData);
-      console.log("Registration response:", response);
 
       if (!response) {
         throw new Error("No response from registration API");
       }
 
-      setIsLoading(false);
       navigate("/login");
     } catch (error) {
-      console.error("Registration failed:", error);
-      throw new Error("Registration failed. Please try again.");
-    } finally {
-      setIsLoading(false);
+      throw error;
     }
   };
 
@@ -148,12 +131,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         throw new Error(`no response from logout API`);
       }
     } catch (error) {
-      console.error("Logout failed: ", error);
       throw new Error("Logout failed. Please try again.");
-    } finally {
-      setIsLoading(false);
     }
     setUser(null);
+    setToken(null);
+    setIsAuthenticated(false);
     localStorage.removeItem("user");
     localStorage.removeItem("accessToken");
   };
