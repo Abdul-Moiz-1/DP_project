@@ -1,9 +1,8 @@
 import { Link } from 'react-router-dom';
-import { Card, CardBody, Button, Badge } from '@heroui/react';
 import { motion } from 'framer-motion';
-import { Zap } from 'lucide-react';
-import { CalendarIcon, LocationIcon, TicketIcon, HeartIcon } from '../Icons';
+import { Calendar, MapPin, Heart, Users } from 'lucide-react';
 import { formatDistance } from '@/lib/distance';
+import { cn } from '@/lib/utils';
 
 export interface EventCardProps {
   id: string;
@@ -12,12 +11,16 @@ export interface EventCardProps {
   location: string;
   imageUrl: string;
   price: number;
+  category?: string;
+  attendeeCount?: number;
   highlights?: string[];
   isSaved?: boolean;
   onSaveToggle?: (id: string, currentlySaved: boolean) => void;
-  distance?: number; // Distance in kilometers
+  distance?: number;
   distanceColor?: 'success' | 'warning' | 'default' | 'danger';
 }
+
+const FALLBACK_IMG = 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600';
 
 const EventCard = ({
   id,
@@ -26,18 +29,16 @@ const EventCard = ({
   location,
   imageUrl,
   price,
+  category,
+  attendeeCount,
   highlights = [],
   isSaved = false,
   onSaveToggle,
   distance,
-  distanceColor = 'default',
 }: EventCardProps) => {
-  const dateParts = date ? date.split(' ') : [];
-  const month = dateParts[0] ? dateParts[0].slice(0, 3).toUpperCase() : 'TBD';
-  const day = dateParts[1] ? dateParts[1].replace(',', '') : '--';
   const isFree = price === 0;
 
-  const handleHeartClick = (e: React.MouseEvent | React.KeyboardEvent) => {
+  const handleHeartClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     onSaveToggle?.(id, isSaved);
@@ -45,116 +46,100 @@ const EventCard = ({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 16 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-50px' }}
-      transition={{ duration: 0.5 }}
-      whileHover={{ y: -5 }}
+      viewport={{ once: true, margin: '-40px' }}
+      transition={{ duration: 0.4 }}
     >
-      <Card
-        className="group relative overflow-hidden transition-all duration-300 shadow-sm hover:shadow-2xl border-none bg-background/60 backdrop-blur-md"
-        isPressable
-        as={Link}
+      <Link
         to={`/events/${id}`}
+        className="card-base overflow-hidden group block transition-all duration-200 hover:-translate-y-0.5"
       >
-        <div className="relative h-56 overflow-hidden bg-default-100">
+        {/* Image */}
+        <div className="relative h-44 overflow-hidden bg-default-100">
           <img
-            src={imageUrl || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87'}
+            src={imageUrl || FALLBACK_IMG}
             alt={title}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             loading="lazy"
+            onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_IMG; }}
           />
 
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          {/* Category badge */}
+          {category && (
+            <div className="absolute bottom-3 left-3 px-2.5 py-1 bg-black/60 backdrop-blur-sm text-white text-xs font-medium rounded-full">
+              {category}
+            </div>
+          )}
 
-          {/* Save/Favorite Button */}
-          <div
-            role="button"
-            tabIndex={0}
+          {/* Save button */}
+          <button
             aria-label={isSaved ? 'Remove from saved' : 'Save event'}
             onClick={handleHeartClick}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleHeartClick(e); }}
-            className="absolute top-3 right-3 p-2.5 bg-white/30 backdrop-blur-md text-white rounded-full hover:bg-white hover:text-danger hover:shadow-lg transition-all cursor-pointer z-10"
+            className={cn(
+              'absolute top-3 right-3 p-1.5 rounded-full transition-all',
+              isSaved
+                ? 'bg-white/90 text-danger'
+                : 'bg-white/90 backdrop-blur-sm text-default-500 hover:text-danger hover:bg-white'
+            )}
           >
-            <HeartIcon className={isSaved ? 'fill-danger text-danger' : ''} />
-          </div>
-
-          {/* Date Badge */}
-          <div className="absolute bottom-3 left-3 bg-background/95 backdrop-blur-md rounded-xl p-2 text-center min-w-[55px] shadow-lg border border-default-200/50">
-            <div className="text-primary font-bold text-xs uppercase tracking-wider">{month}</div>
-            <div className="text-2xl font-bold text-foreground leading-none mt-1">{day}</div>
-          </div>
+            <Heart size={16} className={isSaved ? 'fill-danger' : ''} />
+          </button>
         </div>
 
-        <CardBody className="p-5">
-          <h3 className="text-xl font-display font-bold mb-3 group-hover:text-primary transition-colors line-clamp-1">
+        {/* Body */}
+        <div className="p-4">
+          <div className="flex items-center gap-1.5 text-xs text-default-500 mb-1.5">
+            <Calendar size={13} className="flex-none" />
+            <span>{date}</span>
+            {distance !== undefined && (
+              <span className="ml-auto text-xs text-default-400">{formatDistance(distance)}</span>
+            )}
+          </div>
+
+          <h3 className="font-display font-semibold text-base leading-tight line-clamp-2 mb-2 group-hover:text-primary transition-colors">
             {title}
           </h3>
-          <div className="space-y-2.5 mb-2">
-            <div className="flex items-center gap-3 text-sm text-default-600">
-              <CalendarIcon className="text-primary/70" />
-              <span className="font-medium">{date}</span>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-3 text-sm text-default-600 flex-1">
-                <LocationIcon className="text-primary/70 flex-shrink-0" />
-                <span className="line-clamp-1 font-medium">{location}</span>
-              </div>
-              {distance !== undefined && (
-                <Badge
-                  color={distanceColor}
-                  size="sm"
-                  variant="shadow"
-                  className="flex-shrink-0 text-xs font-semibold"
-                  content={
-                    <div className="flex items-center gap-1">
-                      <Zap size={12} />
-                      {formatDistance(distance)}
-                    </div>
-                  }
-                />
-              )}
-            </div>
+
+          <div className="flex items-center gap-1 text-xs text-default-500">
+            <MapPin size={12} className="flex-none" />
+            <span className="truncate">{location}</span>
           </div>
+
           {highlights.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-4">
-              {highlights.slice(0, 2).map((highlight) => (
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              {highlights.slice(0, 2).map((h) => (
                 <span
-                  key={highlight}
-                  className="inline-flex items-center rounded-full bg-primary-50 text-primary text-xs font-medium px-2.5 py-1"
+                  key={h}
+                  className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/8 text-primary text-xs font-medium"
                 >
-                  {highlight}
+                  {h}
                 </span>
               ))}
             </div>
           )}
-        </CardBody>
-
-        <div className="px-5 pb-5 pt-0 flex justify-between items-end">
-          <div>
-            {isFree ? (
-              <p className="text-xl font-bold text-success">Free</p>
-            ) : price != null ? (
-              <div>
-                <p className="text-xs font-semibold text-default-400 uppercase tracking-wider mb-1">Starting from</p>
-                <p className="text-xl font-bold text-foreground">${price}</p>
-              </div>
-            ) : (
-              <p className="text-sm font-medium text-default-400">Price TBD</p>
-            )}
-          </div>
-
-          <Button
-            color="primary"
-            variant="flat"
-            size="sm"
-            className="font-semibold group-hover:bg-primary group-hover:text-white transition-colors"
-            startContent={<TicketIcon />}
-          >
-            Get Tickets
-          </Button>
         </div>
-      </Card>
+
+        {/* Footer */}
+        <div className="px-4 pb-4 pt-3 flex items-center justify-between border-t border-divider">
+          {attendeeCount !== undefined && attendeeCount > 0 ? (
+            <div className="flex items-center gap-1.5 text-xs text-default-500">
+              <Users size={13} />
+              <span>+{attendeeCount} attending</span>
+            </div>
+          ) : (
+            <span />
+          )}
+
+          {isFree ? (
+            <span className="text-sm font-medium text-success">Free</span>
+          ) : price != null ? (
+            <span className="text-sm font-semibold text-primary">From ${price}</span>
+          ) : (
+            <span className="text-xs text-default-400">Price TBD</span>
+          )}
+        </div>
+      </Link>
     </motion.div>
   );
 };

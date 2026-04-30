@@ -1,6 +1,5 @@
-// src/components/home/SearchBar.tsx
 import { Input } from '@heroui/react';
-import { SearchIcon } from '../Icons';
+import { Search } from 'lucide-react';
 
 interface SearchBarProps {
   query: string;
@@ -22,11 +21,11 @@ const SearchBar = ({
       size={size}
       value={query}
       onChange={(e) => onChange(e.target.value)}
-      endContent = {<SearchIcon />}
+      startContent={<Search size={16} className="text-default-400 flex-none" />}
       classNames={{
         base: 'max-w-full flex-1',
         input: 'text-foreground',
-        inputWrapper: 'bg-white dark:bg-gray-900 text-foreground shadow-lg',
+        inputWrapper: 'bg-transparent shadow-none border-none',
       }}
     />
   );

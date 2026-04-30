@@ -1,57 +1,124 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Pagination, Select, SelectItem, Input, Button, Chip } from "@heroui/react";
+import {
+  Pagination,
+  Select,
+  SelectItem,
+  Input,
+  Button,
+  Chip,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+} from "@heroui/react";
 import EventGrid from "@/components/home/EventGrid";
-import SearchBar from "@/components/home/SearchBar";
 import { api } from "@/api/api";
-import { LayoutGrid, List, X } from "lucide-react";
+import {
+  LayoutGrid,
+  Map as MapIcon,
+  SlidersHorizontal,
+  Search,
+  MapPin,
+} from "lucide-react";
 import EventsResultsMap from "@/components/events/EventsResultsMap";
 import { Event } from "@/api/types";
 import { calculateDistance, getDistanceColor } from "@/lib/distance";
+import { cn } from "@/lib/utils";
 
 interface Category {
   id: number;
   name: string;
 }
 
+function FilterSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="space-y-2.5">
+      <h4 className="text-xs font-semibold uppercase tracking-wider text-default-500">
+        {title}
+      </h4>
+      {children}
+    </div>
+  );
+}
+
 const Events = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const pageParam = parseInt(searchParams.get("page") || "1", 10);
-  const searchParam = searchParams.get("search") || "";
-  const cityParam = searchParams.get("city") || "";
-  const countryParam = searchParams.get("country") || "";
-  const categoryParam = searchParams.get("categoryId") || "";
-  const startDateParam = searchParams.get("startDate") || "";
-  const endDateParam = searchParams.get("endDate") || "";
-  const latitudeParam = searchParams.get("latitude") || "";
-  const longitudeParam = searchParams.get("longitude") || "";
-  const radiusParam = searchParams.get("radius") || "";
-  const sortByParam = searchParams.get("sortBy") || "";
+  // Read initial state from URL
+  const initialSearch = searchParams.get("search") || "";
+  const initialCity = searchParams.get("city") || "";
+  const initialCountry = searchParams.get("country") || "";
+  const initialCategoryId = searchParams.get("categoryId") || "";
+  const initialCategoryName = searchParams.get("category") || "";
+  const initialStartDate = searchParams.get("startDate") || "";
+  const initialEndDate = searchParams.get("endDate") || "";
+  const initialLatitude = searchParams.get("latitude") || "";
+  const initialLongitude = searchParams.get("longitude") || "";
+  const initialRadius = searchParams.get("radius") || "50";
+  const initialSortBy = searchParams.get("sortBy") || "";
+  const initialPage = parseInt(searchParams.get("page") || "1", 10);
 
-  const [searchTerm, setSearchTerm] = useState(searchParam);
-  const [city, setCity] = useState(cityParam);
-  const [country, setCountry] = useState(countryParam);
-  const [categoryId, setCategoryId] = useState(categoryParam);
-  const [startDate, setStartDate] = useState(startDateParam);
-  const [endDate, setEndDate] = useState(endDateParam);
-  const [latitude, setLatitude] = useState(latitudeParam);
-  const [longitude, setLongitude] = useState(longitudeParam);
-  const [radius, setRadius] = useState(radiusParam || "50");
-  const [sortBy, setSortBy] = useState(sortByParam);
-  const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(pageParam);
-  const [totalPages, setTotalPages] = useState<number>(1);
-  const [totalEvents, setTotalEvents] = useState<number>(0);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  // Search: local input (immediate) vs debounced term (triggers fetch)
+  const [searchInput, setSearchInput] = useState(initialSearch);
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
+
+  // Filters
+  const [city, setCity] = useState(initialCity);
+  const [country, setCountry] = useState(initialCountry);
+  const [categoryId, setCategoryId] = useState(initialCategoryId);
+  const [startDate, setStartDate] = useState(initialStartDate);
+  const [endDate, setEndDate] = useState(initialEndDate);
+  const [latitude, setLatitude] = useState(initialLatitude);
+  const [longitude, setLongitude] = useState(initialLongitude);
+  const [radius, setRadius] = useState(initialRadius);
+  const [sortBy, setSortBy] = useState(initialSortBy);
+
+  // UI
+  const [viewMode, setViewMode] = useState<"grid" | "map">("grid");
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [locationError, setLocationError] = useState("");
 
+  // Data
+  const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(initialPage);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalEvents, setTotalEvents] = useState(0);
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  // Debounce search input → search term
   useEffect(() => {
-    api.get("/categories").then((res) => setCategories(res.data)).catch(() => {});
+    const timer = setTimeout(() => {
+      setSearchTerm(searchInput);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  // Load categories; resolve category name → id if coming from hero chips
+  useEffect(() => {
+    api
+      .get("/categories")
+      .then((res) => {
+        const cats: Category[] = res.data;
+        setCategories(cats);
+        if (initialCategoryName && !initialCategoryId) {
+          const decoded = decodeURIComponent(
+            initialCategoryName.replace(/\+/g, " ").replace(/%26/g, "&"),
+          );
+          const match = cats.find(
+            (c) => c.name.toLowerCase() === decoded.toLowerCase(),
+          );
+          if (match) setCategoryId(match.id.toString());
+        }
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Sync state → URL params
   useEffect(() => {
     const params: Record<string, string> = {};
     if (searchTerm) params.search = searchTerm;
@@ -62,12 +129,16 @@ const Events = () => {
     if (endDate) params.endDate = endDate;
     if (latitude) params.latitude = latitude;
     if (longitude) params.longitude = longitude;
-    if (radius) params.radius = radius;
+    if (radius && radius !== "50") params.radius = radius;
     if (sortBy) params.sortBy = sortBy;
     params.page = currentPage.toString();
-    setSearchParams(params);
-  }, [searchTerm, city, country, categoryId, startDate, endDate, latitude, longitude, radius, sortBy, currentPage, setSearchParams]);
+    setSearchParams(params, { replace: true });
+  }, [
+    searchTerm, city, country, categoryId, startDate, endDate,
+    latitude, longitude, radius, sortBy, currentPage, setSearchParams,
+  ]);
 
+  // Fetch events
   useEffect(() => {
     const fetchEvents = async () => {
       setLoading(true);
@@ -90,310 +161,476 @@ const Events = () => {
         setFilteredEvents(data?.items || []);
         setTotalPages(data?.pages || 1);
         setTotalEvents(data?.total || 0);
-      } catch (error) {
-        console.error("Error fetching events:", error);
+      } catch {
+        setFilteredEvents([]);
       } finally {
         setLoading(false);
       }
     };
     fetchEvents();
-  }, [searchTerm, city, country, categoryId, startDate, endDate, latitude, longitude, radius, sortBy, currentPage]);
+  }, [
+    searchTerm, city, country, categoryId, startDate, endDate,
+    latitude, longitude, radius, sortBy, currentPage,
+  ]);
 
-  const handleSearch = (term: string) => {
-    setSearchTerm(term);
-    setCurrentPage(1);
-  };
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
+    setSearchInput("");
+    setSearchTerm("");
     setCity("");
     setCountry("");
     setCategoryId("");
     setStartDate("");
     setEndDate("");
-    setSearchTerm("");
     setLatitude("");
     setLongitude("");
     setRadius("50");
     setSortBy("");
     setLocationError("");
     setCurrentPage(1);
-  };
+  }, []);
 
-  const useCurrentLocation = () => {
+  const useCurrentLocation = useCallback(() => {
     setLocationError("");
     if (!navigator.geolocation) {
-      setLocationError("Geolocation is not supported by your browser.");
+      setLocationError("Geolocation not supported by your browser.");
       return;
     }
-
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLatitude(position.coords.latitude.toString());
-        setLongitude(position.coords.longitude.toString());
+      (pos) => {
+        setLatitude(pos.coords.latitude.toString());
+        setLongitude(pos.coords.longitude.toString());
         setSortBy("distance");
         setCurrentPage(1);
       },
-      () => setLocationError("Location permission denied. Please enable access to search nearby events."),
+      () => setLocationError("Location permission denied. Please enable access."),
     );
+  }, []);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const hasActiveFilters = city || country || categoryId || startDate || endDate || (latitude && longitude);
+  // Map event data for EventCard
+  const cardEvents = filteredEvents.map((event) => {
+    let distance: number | undefined;
+    let distanceColor: "success" | "warning" | "default" | "danger" = "default";
+    if (latitude && longitude && event.location?.latitude && event.location?.longitude) {
+      distance = calculateDistance(
+        parseFloat(latitude),
+        parseFloat(longitude),
+        event.location.latitude,
+        event.location.longitude,
+      );
+      distanceColor = getDistanceColor(distance);
+    }
+    return {
+      id: event.id?.toString(),
+      title: event.name,
+      date: new Date(event.startDate).toLocaleDateString(undefined, {
+        month: "short", day: "numeric", year: "numeric",
+      }),
+      location: event.location
+        ? `${event.location.city}, ${event.location.country}`
+        : "Location TBD",
+      imageUrl:
+        event.images?.[0]?.imageUrl ||
+        "https://images.unsplash.com/photo-1540575467063-178a50c2df87",
+      price: event.tickets?.length
+        ? Math.min(...event.tickets.map((t) => t.price))
+        : 0,
+      category: event.categories?.[0]?.name,
+      distance,
+      distanceColor,
+    };
+  });
 
-  return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-4xl font-bold text-foreground">Discover Events</h1>
-        <p className="mt-2 text-default-500">
-          Find concerts, conferences, workshops, and more
-        </p>
-      </div>
+  const hasActiveFilters = !!(
+    city || country || categoryId || startDate || endDate ||
+    (latitude && longitude) || searchTerm
+  );
 
-      {/* Search Bar */}
-      <SearchBar
-        query={searchTerm}
-        onChange={handleSearch}
-        placeholder="Search events by name or description..."
-        size="lg"
-      />
+  const filterCount = [
+    city, country, categoryId, startDate, endDate,
+    latitude && longitude ? "loc" : "",
+  ].filter(Boolean).length;
 
-      {/* Filters Row */}
-      <div className="mt-6 flex flex-wrap gap-3 items-end">
-        <div className="w-full sm:w-auto min-w-[160px]">
-          <Select
-            label="Category"
-            placeholder="All Categories"
-            size="sm"
-            selectedKeys={categoryId ? [categoryId] : []}
-            onSelectionChange={(keys) => {
-              const val = Array.from(keys)[0]?.toString() || "";
-              setCategoryId(val);
-              setCurrentPage(1);
-            }}
-          >
-            {categories.map((cat) => (
-              <SelectItem key={cat.id.toString()}>
-                {cat.name}
-              </SelectItem>
-            ))}
-          </Select>
+  // Shared filter panel (used in both sidebar and mobile modal)
+  const filtersPanel = (
+    <div className="space-y-5">
+      {/* Category */}
+      <FilterSection title="Category">
+        <div className="flex flex-wrap gap-1.5">
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => {
+                setCategoryId((prev) =>
+                  prev === cat.id.toString() ? "" : cat.id.toString(),
+                );
+                setCurrentPage(1);
+              }}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
+                categoryId === cat.id.toString()
+                  ? "bg-primary text-white"
+                  : "bg-default-100 text-default-600 hover:bg-default-200",
+              )}
+            >
+              {cat.name}
+            </button>
+          ))}
         </div>
+      </FilterSection>
 
-        <div className="w-full sm:w-auto min-w-[160px]">
-          <Input
-            label="City"
-            placeholder="Filter by city"
-            size="sm"
-            value={city}
-            onChange={(e) => {
-              setCity(e.target.value);
-              setCurrentPage(1);
-            }}
-          />
-        </div>
+      <div className="h-px bg-divider" />
 
-        <div className="w-full sm:w-auto min-w-[160px]">
-          <Input
-            label="Country"
-            placeholder="Filter by country"
-            size="sm"
-            value={country}
-            onChange={(e) => {
-              setCountry(e.target.value);
-              setCurrentPage(1);
-            }}
-          />
-        </div>
-
-        <div className="w-full sm:w-auto min-w-[160px]">
+      {/* Date range */}
+      <FilterSection title="Date Range">
+        <div className="space-y-2">
           <Input
             type="date"
-            label="Start Date"
+            label="From"
             size="sm"
             value={startDate}
-            onChange={(e) => {
-              setStartDate(e.target.value);
-              setCurrentPage(1);
-            }}
+            onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }}
           />
-        </div>
-
-        <div className="w-full sm:w-auto min-w-[160px]">
           <Input
             type="date"
-            label="End Date"
+            label="To"
             size="sm"
             value={endDate}
-            onChange={(e) => {
-              setEndDate(e.target.value);
-              setCurrentPage(1);
-            }}
+            onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }}
           />
         </div>
+      </FilterSection>
 
-        <div className="w-full sm:w-auto min-w-[140px]">
-          <Input
-            type="number"
-            label="Radius (km)"
-            size="sm"
-            value={radius}
-            min={1}
-            onChange={(e) => {
-              setRadius(e.target.value || "50");
-              setCurrentPage(1);
-            }}
-          />
+      <div className="h-px bg-divider" />
+
+      {/* Location */}
+      <FilterSection title="Location">
+        <Input
+          placeholder="City"
+          size="sm"
+          value={city}
+          onChange={(e) => { setCity(e.target.value); setCurrentPage(1); }}
+        />
+        <Input
+          placeholder="Country"
+          size="sm"
+          value={country}
+          onChange={(e) => { setCountry(e.target.value); setCurrentPage(1); }}
+          className="mt-2"
+        />
+        <Button
+          size="sm"
+          variant="flat"
+          color="primary"
+          startContent={<MapPin size={13} />}
+          onPress={useCurrentLocation}
+          className="w-full mt-2"
+        >
+          Use My Location
+        </Button>
+        {latitude && longitude && (
+          <div className="mt-2 space-y-1">
+            <p className="text-xs text-default-500">Radius (km)</p>
+            <Input
+              type="number"
+              size="sm"
+              value={radius}
+              min={1}
+              onChange={(e) => { setRadius(e.target.value || "50"); setCurrentPage(1); }}
+            />
+          </div>
+        )}
+        {locationError && (
+          <p className="text-xs text-danger mt-1">{locationError}</p>
+        )}
+      </FilterSection>
+    </div>
+  );
+
+  const hasEventsWithCoords = filteredEvents.some(
+    (e) => e.location?.latitude && e.location?.longitude,
+  );
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="container-app py-8">
+        {/* Page header */}
+        <div className="mb-6">
+          <h1 className="font-display text-3xl font-bold text-foreground">
+            Discover Events
+          </h1>
+          <p className="text-default-500 mt-1 text-sm">
+            Find concerts, conferences, workshops, and more
+          </p>
         </div>
 
-        <div className="w-full sm:w-auto min-w-[180px]">
+        {/* Top bar */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-5 items-stretch sm:items-center">
+          {/* Search */}
+          <div className="flex-1 relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-default-400 pointer-events-none" />
+            <input
+              className="w-full h-11 pl-10 pr-4 rounded-xl border border-divider bg-content1 text-sm text-foreground placeholder:text-default-400 focus:outline-none focus:border-primary transition-colors"
+              placeholder="Search events..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </div>
+
+          {/* Sort */}
           <Select
-            label="Sort By"
-            placeholder="Date"
             size="sm"
+            placeholder="Sort: Date"
+            aria-label="Sort by"
+            className="w-full sm:w-40"
             selectedKeys={sortBy ? [sortBy] : []}
             onSelectionChange={(keys) => {
-              const val = Array.from(keys)[0]?.toString() || "";
-              setSortBy(val);
+              setSortBy(Array.from(keys)[0]?.toString() || "");
               setCurrentPage(1);
             }}
           >
             <SelectItem key="date">Date</SelectItem>
             <SelectItem key="price">Price</SelectItem>
-            <SelectItem key="distance">Distance</SelectItem>
+            <SelectItem key="distance">Nearby</SelectItem>
           </Select>
-        </div>
 
-        <Button size="sm" variant="flat" color="primary" onPress={useCurrentLocation}>
-          Use My Location
-        </Button>
+          {/* View toggle — desktop */}
+          <div className="hidden sm:flex rounded-xl border border-divider overflow-hidden flex-none">
+            <button
+              onClick={() => setViewMode("grid")}
+              className={cn(
+                "px-3 py-2 transition-colors",
+                viewMode === "grid"
+                  ? "bg-primary text-white"
+                  : "text-default-500 hover:bg-default-100",
+              )}
+              aria-label="Grid view"
+            >
+              <LayoutGrid size={16} />
+            </button>
+            <button
+              onClick={() => setViewMode("map")}
+              className={cn(
+                "px-3 py-2 transition-colors",
+                viewMode === "map"
+                  ? "bg-primary text-white"
+                  : "text-default-500 hover:bg-default-100",
+              )}
+              aria-label="Map view"
+            >
+              <MapIcon size={16} />
+            </button>
+          </div>
 
-        {/* View Toggle */}
-        <div className="flex gap-1 ml-auto">
+          {/* Mobile filter button */}
           <Button
-            isIconOnly
             size="sm"
-            variant={viewMode === "grid" ? "solid" : "flat"}
-            color={viewMode === "grid" ? "primary" : "default"}
-            onPress={() => setViewMode("grid")}
-            aria-label="Grid view"
+            variant="bordered"
+            startContent={<SlidersHorizontal size={14} />}
+            onPress={() => setIsFilterOpen(true)}
+            className="lg:hidden"
           >
-            <LayoutGrid size={16} />
+            Filters
+            {filterCount > 0 && (
+              <span className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-white text-xs font-bold">
+                {filterCount}
+              </span>
+            )}
           </Button>
-          <Button
-            isIconOnly
-            size="sm"
-            variant={viewMode === "list" ? "solid" : "flat"}
-            color={viewMode === "list" ? "primary" : "default"}
-            onPress={() => setViewMode("list")}
-            aria-label="List view"
-          >
-            <List size={16} />
-          </Button>
+        </div>
+
+        {/* Active filter chips */}
+        {hasActiveFilters && (
+          <div className="flex flex-wrap gap-2 mb-5">
+            {searchTerm && (
+              <Chip
+                size="sm"
+                variant="flat"
+                color="primary"
+                onClose={() => { setSearchInput(""); setSearchTerm(""); }}
+              >
+                Search: {searchTerm}
+              </Chip>
+            )}
+            {categoryId && (
+              <Chip size="sm" variant="flat" color="primary" onClose={() => setCategoryId("")}>
+                {categories.find((c) => c.id.toString() === categoryId)?.name ?? "Category"}
+              </Chip>
+            )}
+            {city && (
+              <Chip size="sm" variant="flat" color="primary" onClose={() => setCity("")}>
+                City: {city}
+              </Chip>
+            )}
+            {country && (
+              <Chip size="sm" variant="flat" color="primary" onClose={() => setCountry("")}>
+                Country: {country}
+              </Chip>
+            )}
+            {startDate && (
+              <Chip size="sm" variant="flat" color="primary" onClose={() => setStartDate("")}>
+                From: {startDate}
+              </Chip>
+            )}
+            {endDate && (
+              <Chip size="sm" variant="flat" color="primary" onClose={() => setEndDate("")}>
+                To: {endDate}
+              </Chip>
+            )}
+            {latitude && longitude && (
+              <Chip
+                size="sm"
+                variant="flat"
+                color="primary"
+                onClose={() => { setLatitude(""); setLongitude(""); setSortBy(""); }}
+              >
+                Near me · {radius} km
+              </Chip>
+            )}
+            <button
+              onClick={clearFilters}
+              className="text-xs text-default-400 hover:text-danger transition-colors self-center"
+            >
+              Clear all
+            </button>
+          </div>
+        )}
+
+        {/* Two-column layout */}
+        <div className="flex gap-6 items-start">
+          {/* Filter sidebar — desktop only */}
+          <aside className="hidden lg:block w-72 flex-none">
+            <div className="card-base p-5 sticky top-20">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="font-semibold text-sm">Filters</h3>
+                {hasActiveFilters && (
+                  <button
+                    onClick={clearFilters}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Clear all
+                  </button>
+                )}
+              </div>
+              {filtersPanel}
+            </div>
+          </aside>
+
+          {/* Results */}
+          <div className="flex-1 min-w-0">
+            {/* Results count + mobile view toggle */}
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-default-500">
+                {loading ? (
+                  "Loading…"
+                ) : (
+                  <>
+                    <span className="font-semibold text-foreground">{totalEvents}</span>{" "}
+                    {totalEvents === 1 ? "event" : "events"} found
+                  </>
+                )}
+              </p>
+
+              {/* View toggle — mobile */}
+              <div className="flex sm:hidden rounded-xl border border-divider overflow-hidden">
+                <button
+                  onClick={() => setViewMode("grid")}
+                  className={cn(
+                    "px-3 py-2 transition-colors",
+                    viewMode === "grid"
+                      ? "bg-primary text-white"
+                      : "text-default-500 hover:bg-default-100",
+                  )}
+                  aria-label="Grid view"
+                >
+                  <LayoutGrid size={15} />
+                </button>
+                <button
+                  onClick={() => setViewMode("map")}
+                  className={cn(
+                    "px-3 py-2 transition-colors",
+                    viewMode === "map"
+                      ? "bg-primary text-white"
+                      : "text-default-500 hover:bg-default-100",
+                  )}
+                  aria-label="Map view"
+                >
+                  <MapIcon size={15} />
+                </button>
+              </div>
+            </div>
+
+            {/* Grid view */}
+            {viewMode === "grid" && (
+              <EventGrid events={cardEvents} isLoading={loading} />
+            )}
+
+            {/* Map view */}
+            {viewMode === "map" && (
+              hasEventsWithCoords ? (
+                <EventsResultsMap events={filteredEvents} className="h-[560px]" />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-default-200 rounded-2xl">
+                  <MapIcon size={40} className="text-default-300 mb-3" />
+                  <p className="text-sm text-default-400">
+                    {loading ? "Loading events…" : "No events with location data to display"}
+                  </p>
+                </div>
+              )
+            )}
+
+            {/* Pagination (grid only) */}
+            {viewMode === "grid" && totalPages > 1 && (
+              <div className="flex justify-center mt-8">
+                <Pagination
+                  total={totalPages}
+                  page={currentPage}
+                  onChange={handlePageChange}
+                  color="primary"
+                  showControls
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Active Filters */}
-      {hasActiveFilters && (
-        <div className="mt-4 flex flex-wrap gap-2 items-center">
-          <span className="text-sm text-default-500">Filters:</span>
-          {city && (
-            <Chip size="sm" variant="flat" onClose={() => setCity("")}>
-              City: {city}
-            </Chip>
+      {/* Mobile filter modal */}
+      <Modal
+        isOpen={isFilterOpen}
+        onOpenChange={setIsFilterOpen}
+        placement="bottom"
+        scrollBehavior="inside"
+      >
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex items-center justify-between pb-2">
+                <span className="font-semibold">Filters</span>
+                {hasActiveFilters && (
+                  <button
+                    onClick={() => { clearFilters(); onClose(); }}
+                    className="text-xs text-danger font-medium"
+                  >
+                    Clear all
+                  </button>
+                )}
+              </ModalHeader>
+              <ModalBody>{filtersPanel}</ModalBody>
+              <ModalFooter>
+                <Button color="primary" className="w-full" onPress={onClose}>
+                  Show {loading ? "…" : totalEvents}{" "}
+                  {totalEvents === 1 ? "event" : "events"}
+                </Button>
+              </ModalFooter>
+            </>
           )}
-          {country && (
-            <Chip size="sm" variant="flat" onClose={() => setCountry("")}>
-              Country: {country}
-            </Chip>
-          )}
-          {categoryId && (
-            <Chip size="sm" variant="flat" onClose={() => setCategoryId("")}>
-              Category: {categories.find((c) => c.id.toString() === categoryId)?.name || categoryId}
-            </Chip>
-          )}
-          {startDate && (
-            <Chip size="sm" variant="flat" onClose={() => setStartDate("")}>
-              From: {startDate}
-            </Chip>
-          )}
-          {endDate && (
-            <Chip size="sm" variant="flat" onClose={() => setEndDate("")}>
-              To: {endDate}
-            </Chip>
-          )}
-          {latitude && longitude && (
-            <Chip size="sm" variant="flat" onClose={() => { setLatitude(""); setLongitude(""); setSortBy(""); }}>
-              Near me: {radius} km
-            </Chip>
-          )}
-          <Button size="sm" variant="light" color="danger" startContent={<X size={14} />} onPress={clearFilters}>
-            Clear all
-          </Button>
-        </div>
-      )}
-
-      {locationError && (
-        <p className="mt-3 text-sm text-danger">{locationError}</p>
-      )}
-
-      {/* Results Count */}
-      <div className="flex justify-between items-center mt-6">
-        <p className="text-default-500">
-          {totalEvents > 0
-            ? `Showing ${filteredEvents.length} of ${totalEvents} events`
-            : "No events found"}
-        </p>
-      </div>
-
-      {/* Event Grid */}
-      <div className="mt-6 space-y-6">
-        <EventsResultsMap events={filteredEvents} />
-        <EventGrid 
-          events={filteredEvents.map((event) => {
-            let distance: number | undefined;
-            let distanceColor: 'success' | 'warning' | 'default' | 'danger' = 'default';
-
-            // Calculate distance if user location and event location are available
-            if (latitude && longitude && event.location?.latitude && event.location?.longitude) {
-              const userLat = parseFloat(latitude);
-              const userLng = parseFloat(longitude);
-              distance = calculateDistance(userLat, userLng, event.location.latitude, event.location.longitude);
-              distanceColor = getDistanceColor(distance);
-            }
-
-            return {
-              id: event.id?.toString(),
-              title: event.name,
-              date: new Date(event.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
-              location: event.location ? `${event.location.city}, ${event.location.country}` : 'Location TBD',
-              imageUrl: event.images?.[0]?.imageUrl || "https://images.unsplash.com/photo-1540575467063-178a50c2df87",
-              price: event.tickets && event.tickets.length > 0 ? Math.min(...event.tickets.map((t) => t.price)) : 0,
-              distance,
-              distanceColor,
-            };
-          })} 
-          isLoading={loading} 
-        />
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center mt-10">
-          <Pagination
-            total={totalPages}
-            page={currentPage}
-            onChange={handlePageChange}
-            color="primary"
-            showControls
-            size="lg"
-          />
-        </div>
-      )}
+        </ModalContent>
+      </Modal>
     </div>
   );
 };

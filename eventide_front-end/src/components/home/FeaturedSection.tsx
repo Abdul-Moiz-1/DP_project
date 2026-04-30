@@ -1,6 +1,19 @@
-// src/components/home/FeaturedSection.tsx
-import { Spinner } from '@heroui/react';
+import { Link } from 'react-router-dom';
 import EventCard, { EventCardProps } from '../events/EventCard';
+import { EventCardSkeleton } from '../common/LoadingState';
+
+const CATEGORY_CHIPS = [
+  { emoji: '🎵', label: 'Music', query: 'Music' },
+  { emoji: '💻', label: 'Tech', query: 'Technology' },
+  { emoji: '🎨', label: 'Arts', query: 'Arts+%26+Culture' },
+  { emoji: '🍕', label: 'Food', query: 'Food+%26+Drink' },
+  { emoji: '⚽', label: 'Sports', query: 'Sports+%26+Fitness' },
+  { emoji: '😂', label: 'Comedy', query: 'Comedy+%26+Entertainment' },
+  { emoji: '🏕️', label: 'Outdoors', query: 'Travel+%26+Outdoor' },
+  { emoji: '🎮', label: 'Gaming', query: 'Gaming+%26+Esports' },
+  { emoji: '💼', label: 'Business', query: 'Business+%26+Networking' },
+  { emoji: '🧘', label: 'Wellness', query: 'Health+%26+Wellness' },
+];
 
 interface FeaturedSectionProps {
   events: EventCardProps[];
@@ -8,38 +21,47 @@ interface FeaturedSectionProps {
 }
 
 const FeaturedSection = ({ events, isLoading = false }: FeaturedSectionProps) => {
-  if (events.length === 0 && !isLoading) {
-    return null; // Don't show section if no featured events
-  }
+  if (events.length === 0 && !isLoading) return null;
 
   return (
-    <section className="py-12 px-4 bg-gradient-to-b from-primary-50/50 to-background dark:from-primary-900/10">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-display font-bold mb-2">
-            Featured Events ⭐
-          </h2>
-          <p className="text-default-500">
-            Hand-picked events you won't want to miss
-          </p>
-        </div>
-
-        {/* Loading State */}
-        {isLoading ? (
-          <div className="flex justify-center py-12">
-            <Spinner size="lg" color="primary" />
-          </div>
-        ) : (
-          /* Event Grid */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {events.map((event) => (
-              <EventCard key={event.id} {...event} />
-            ))}
-          </div>
-        )}
+    <div>
+      {/* Category quick-filter strip */}
+      <div className="flex gap-2 overflow-x-auto pb-3 mb-8" style={{ scrollbarWidth: 'none' }}>
+        {CATEGORY_CHIPS.map((cat) => (
+          <Link
+            key={cat.label}
+            to={`/events?category=${cat.query}`}
+            className="flex-none flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium bg-default-100 text-default-600 hover:bg-primary/10 hover:text-primary transition-colors whitespace-nowrap"
+          >
+            <span>{cat.emoji}</span>
+            {cat.label}
+          </Link>
+        ))}
       </div>
-    </section>
+
+      {/* Section header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="font-display text-2xl font-semibold">Trending Events</h2>
+          <p className="text-sm text-default-500 mt-1">Most popular events right now</p>
+        </div>
+      </div>
+
+      {/* Grid */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <EventCardSkeleton key={i} />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {events.map((event) => (
+            <EventCard key={event.id} {...event} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
 
