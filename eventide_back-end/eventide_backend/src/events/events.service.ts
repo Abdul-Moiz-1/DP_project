@@ -154,13 +154,17 @@ export class EventsService {
       console.log("saving tickets...");
       await this.ticketRepo.save(tickets);
 
+      console.log("finding created event with id:", event.id);
       return this.findOne(event.id);
     } catch (error) {
-      console.error("Event creation error:", error);
+      this.logger.error("Event creation error:", error);
       if (error instanceof BadRequestException || error instanceof NotFoundException) {
         throw error;
       }
-      throw new BadRequestException('Failed to create event', { cause: error });
+      // Extract error message for better debugging
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      this.logger.error(`Event creation failed: ${errorMessage}`, error);
+      throw new BadRequestException(`Failed to create event: ${errorMessage}`);
     }
   }
 

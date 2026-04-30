@@ -1,86 +1,125 @@
-import React from "react";
-import { Card, Divider, Button, Link } from "@heroui/react";
-import { ArrowUpIcon } from "lucide-react";
-import { Logo } from "../Icons";
-import ShareButtons from "../ui/ShareButtons";
+import { Link } from 'react-router-dom';
+import { Twitter, Instagram, Linkedin } from 'lucide-react';
+import { Logo } from '../Icons';
 
-const Footer: React.FC = () => {
+const productLinks = [
+  { label: 'Browse Events', href: '/events' },
+  { label: 'Create Event', href: '/dashboard/create-event' },
+  { label: 'Dashboard', href: '/dashboard' },
+];
+
+const companyLinks = [
+  { label: 'About', href: '/about' },
+  { label: 'Contact', href: '/contact' },
+  { label: 'Privacy Policy', href: '/privacy-policy' },
+];
+
+const socialLinks = [
+  { label: 'Twitter', href: 'https://twitter.com', icon: Twitter },
+  { label: 'Instagram', href: 'https://instagram.com', icon: Instagram },
+  { label: 'LinkedIn', href: 'https://linkedin.com', icon: Linkedin },
+];
+
+const Footer = () => {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="bg-default-100 text-default-700 mt-12">
-      <Card
-        shadow="none"
-        radius="none"
-        className="max-w-7xl mx-auto py-12 px-6 lg:px-8 bg-transparent"
-      >
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-          {/* Left Section */}
-          <div>
-            <span className="text-xl font-bold text-primary mb-3"><Logo className="inline"/>EVENTIDE</span>
-            <p className="text-sm text-default-500 leading-relaxed">
-              Discover and explore the best local events, concerts, and
-              experiences near you — powered by smart search and curated content.
+    <footer className="border-t border-divider mt-12">
+      <div className="container-app py-12">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          {/* Brand */}
+          <div className="md:col-span-1">
+            <Link to="/" className="flex items-center gap-2 mb-3">
+              <div className="h-7 w-7 rounded-lg gradient-primary flex items-center justify-center text-white">
+                <Logo size={16} />
+              </div>
+              <span className="font-display font-semibold text-base text-foreground">Eventide</span>
+            </Link>
+            <p className="text-sm text-default-500 leading-relaxed max-w-xs">
+              Discover and explore the best local events, concerts, and experiences near you.
             </p>
-            <ShareButtons />
+            <div className="flex items-center gap-3 mt-4">
+              {socialLinks.map(({ label, href, icon: Icon }) => (
+                <a
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={label}
+                  className="text-default-400 hover:text-foreground transition-colors"
+                >
+                  <Icon size={18} />
+                </a>
+              ))}
+            </div>
           </div>
 
-          {/* Middle Section: Site Map */}
+          {/* Product */}
           <div>
-            <h3 className="font-semibold text-base mb-3 text-default-800">
-              Site Map
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-default-500 mb-3">
+              Product
             </h3>
-            <ul className="space-y-2 text-sm">
-              {[
-                { label: "Home", href: "/" },
-                { label: "Events", href: "/events" },
-                { label: "About", href: "/about" },
-                { label: "Contact", href: "/contact" },
-              ].map((item) => (
-                  <li key={item.label}>
-                    <Link
-                      href={item.href}
-                      color="foreground"
-                      className="hover:text-primary"
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                ))}
+            <ul className="space-y-2">
+              {productLinks.map((item) => (
+                <li key={item.label}>
+                  <Link
+                    to={item.href}
+                    className="text-sm text-default-500 hover:text-foreground transition-colors"
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
-          {/* Right Section: Legal */}
+          {/* Company */}
           <div>
-            <h3 className="font-semibold text-base mb-3 text-default-800">
-              Legal
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-default-500 mb-3">
+              Company
             </h3>
-            <ul className="space-y-2 text-sm">
-              {["Privacy Policy", "Terms of Service", "Cookies"].map((item) => (
-                <li key={item}>
+            <ul className="space-y-2">
+              {companyLinks.map((item) => (
+                <li key={item.label}>
                   <Link
-                    href={`/${item.toLowerCase().replace(/\s+/g, "-")}`}
-                    color="foreground"
-                    className="hover:text-primary"
+                    to={item.href}
+                    className="text-sm text-default-500 hover:text-foreground transition-colors"
                   >
-                    {item}
+                    {item.label}
                   </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Connect */}
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-default-500 mb-3">
+              Connect
+            </h3>
+            <ul className="space-y-2">
+              {socialLinks.map(({ label, href, icon: Icon }) => (
+                <li key={label}>
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm text-default-500 hover:text-foreground transition-colors"
+                  >
+                    <Icon size={14} />
+                    {label}
+                  </a>
                 </li>
               ))}
             </ul>
           </div>
         </div>
 
-        <Divider className="my-8" />
-
-        {/* Bottom Bar */}
-        <div className="flex flex-col md:flex-row justify-between items-center text-xs text-default-500 gap-2">
+        <div className="border-t border-divider mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-default-400">
           <p>© {year} Eventide. All rights reserved.</p>
-          <p className="text-default-400">
-            Designed with care using HeroUI & React
-          </p>
+          <p>Built with HeroUI &amp; React</p>
         </div>
-      </Card>
+      </div>
     </footer>
   );
 };

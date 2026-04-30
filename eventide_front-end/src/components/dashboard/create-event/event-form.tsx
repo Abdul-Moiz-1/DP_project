@@ -248,9 +248,33 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
     try {
       setIsSubmitting(true)
 
-      // Validation
-      if (new Date(data.startDate!) >= new Date(data.endDate!)) {
+      // Validation: Check that dates are not empty
+      if (!data.startDate || !data.endDate) {
+        error("Please select both start and end dates")
+        setIsSubmitting(false)
+        return
+      }
+
+      const startDate = new Date(data.startDate)
+      const endDate = new Date(data.endDate)
+      const now = new Date()
+
+      // Check if start date is in the future
+      if (startDate <= now) {
+        error("Event start date must be in the future")
+        setIsSubmitting(false)
+        return
+      }
+
+      if (startDate >= endDate) {
         error("End date must be after start date")
+        setIsSubmitting(false)
+        return
+      }
+
+      // Validate capacity
+      if (!data.capacity || data.capacity < 1) {
+        error("Event capacity must be at least 1")
         setIsSubmitting(false)
         return
       }
@@ -265,6 +289,26 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
 
         for (let i = 0; i < data.tickets.length; i++) {
           const t = data.tickets[i]
+          
+          // Validate ticket fields
+          if (!t.name || t.name.trim() === "") {
+            error(`Ticket ${i + 1}: Please enter a ticket name`)
+            setIsSubmitting(false)
+            return
+          }
+          
+          if (typeof t.price !== 'number' || t.price < 0) {
+            error(`Ticket ${i + 1}: Price must be a valid number >= 0`)
+            setIsSubmitting(false)
+            return
+          }
+          
+          if (!t.salesStartDate || !t.salesEndDate) {
+            error(`Ticket ${i + 1}: Please select both sale start and end dates`)
+            setIsSubmitting(false)
+            return
+          }
+          
           if (new Date(t.salesStartDate) >= new Date(t.salesEndDate)) {
             error(`Ticket ${i + 1}: Sale end date must be after start date`)
             setIsSubmitting(false)
@@ -285,6 +329,16 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
         }
       }
 
+      // Format dates first and validate they're not empty
+      const formattedStartDate = formatIso(data.startDate)
+      const formattedEndDate = formatIso(data.endDate)
+      
+      if (!formattedStartDate || !formattedEndDate) {
+        error("Invalid date format. Please ensure dates are properly selected.")
+        setIsSubmitting(false)
+        return
+      }
+
       // For UPDATE: Only send changed fields
       if (initialData) {
         console.log("Updating event. ticketUpdateDisabled:", ticketUpdateDisabled)
@@ -296,13 +350,11 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
         if (data.name !== initialData.name) { updateData.name = data.name; hasChanges = true }
         if (data.description !== initialData.description) { updateData.description = data.description; hasChanges = true }
         
-        const newStartDate = formatIso(data.startDate)
         const oldStartDate = initialData.startDate ? new Date(initialData.startDate).toISOString() : null
-        if (newStartDate !== oldStartDate) { updateData.startDate = newStartDate; hasChanges = true }
+        if (formattedStartDate !== oldStartDate) { updateData.startDate = formattedStartDate; hasChanges = true }
         
-        const newEndDate = formatIso(data.endDate)
         const oldEndDate = initialData.endDate ? new Date(initialData.endDate).toISOString() : null
-        if (newEndDate !== oldEndDate) { updateData.endDate = newEndDate; hasChanges = true }
+        if (formattedEndDate !== oldEndDate) { updateData.endDate = formattedEndDate; hasChanges = true }
         
         if (data.capacity !== initialData.capacity) { updateData.capacity = data.capacity; hasChanges = true }
 
@@ -320,11 +372,21 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
 
         // Tickets - only if not disabled
         if (!ticketUpdateDisabled) {
-          const newTickets = data.tickets.map(t => ({
-            ...t,
-            salesStartDate: formatIso(t.salesStartDate) || "",
-            salesEndDate: formatIso(t.salesEndDate) || "",
-          }))
+          const newTickets = data.tickets.map((t, idx) => {
+            const sStart = formatIso(t.salesStartDate)
+            const sEnd = formatIso(t.salesEndDate)
+            
+            if (!sStart || !sEnd) {
+              throw new Error(`Ticket ${idx + 1}: Invalid date format`)
+            }
+            
+            return {
+              name: t.name,
+              price: typeof t.price === 'number' ? t.price : parseFloat(String(t.price)) || 0,
+              salesStartDate: sStart,
+              salesEndDate: sEnd,
+            }
+          })
           updateData.tickets = newTickets
           hasChanges = true
           console.log("Adding tickets to update")
@@ -373,18 +435,32 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
         }
       } else {
         // For CREATE: Send all fields with values in FormData if images exist, otherwise JSON
+        
+        // Validate and format all ticket dates
+        const formattedTickets = data.tickets.map((t, idx) => {
+          const sStart = formatIso(t.salesStartDate)
+          const sEnd = formatIso(t.salesEndDate)
+          
+          if (!sStart || !sEnd) {
+            throw new Error(`Ticket ${idx + 1}: Invalid date format. Please check date fields.`)
+          }
+          
+          return {
+            name: t.name,
+            price: typeof t.price === 'number' ? t.price : parseFloat(String(t.price)) || 0,
+            salesStartDate: sStart,
+            salesEndDate: sEnd,
+          }
+        })
+        
         const createData: any = {
           name: data.name,
           description: data.description,
-          startDate: formatIso(data.startDate) || "",
-          endDate: formatIso(data.endDate) || "",
+          startDate: formattedStartDate,
+          endDate: formattedEndDate,
           capacity: data.capacity,
           location: data.location,
-          tickets: data.tickets.map(t => ({
-            ...t,
-            salesStartDate: formatIso(t.salesStartDate) || "",
-            salesEndDate: formatIso(t.salesEndDate) || "",
-          })),
+          tickets: formattedTickets,
           categoryIds: selectedCategoryIds,
           imageUrls: previewUrls.filter(url => !url.startsWith("blob:")),
         }
@@ -409,9 +485,21 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
           // Add files
           uploadedFiles.forEach((f) => formData.append("files", f))
           
+          console.log("Creating event with FormData. Data:", {
+            name: createData.name,
+            startDate: createData.startDate,
+            endDate: createData.endDate,
+            capacity: createData.capacity,
+            location: createData.location,
+            tickets: createData.tickets,
+            categoryIds: createData.categoryIds,
+            filesCount: uploadedFiles.length,
+          })
+          
           await onSubmit(formData as any)
         } else {
           // Send as plain JSON for creates without files
+          console.log("Creating event with JSON. Data:", createData)
           await onSubmit(createData as any)
         }
       }
@@ -421,11 +509,24 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
       const errorMsg = err instanceof Error ? err.message : "Failed to save event"
       console.error("Event submission error:", errorMsg, err)
       
-      if (errorMsg.includes("Cannot update tickets when bookings exist")) {
-        console.warn("Ticket update disabled due to bookings. Setting flag.")
-        setTicketUpdateDisabled(true)
-        error("This event has bookings. You can only update images and categories.")
-      } else if (errorMsg !== "Invalid ticket dates") {
+      // Try to extract more detailed error info from axios
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosErr = err as any
+        console.error("Backend response status:", axiosErr.response?.status)
+        console.error("Backend response data:", axiosErr.response?.data)
+        
+        // Extract detailed error message from backend
+        const backendMessage = axiosErr.response?.data?.message || errorMsg
+        if (backendMessage.includes("Failed to create event")) {
+          error(backendMessage)
+        } else if (errorMsg.includes("Cannot update tickets when bookings exist")) {
+          console.warn("Ticket update disabled due to bookings. Setting flag.")
+          setTicketUpdateDisabled(true)
+          error("This event has bookings. You can only update images and categories.")
+        } else if (errorMsg !== "Invalid ticket dates") {
+          error(backendMessage)
+        }
+      } else {
         error(errorMsg)
       }
     } finally {
@@ -500,7 +601,11 @@ export function EventForm({ onSubmit, initialData, isLoading = false }: EventFor
   }, [currentLocation.address, currentLocation.city, currentLocation.country, currentLocation.postalCode, currentLocation.state, setValue])
 
   function toggleCategory(id: number): void {
-    throw new Error("Function not implemented.")
+    setSelectedCategoryIds(prev => 
+      prev.includes(id) 
+        ? prev.filter(catId => catId !== id)
+        : [...prev, id]
+    )
   }
 
   return (

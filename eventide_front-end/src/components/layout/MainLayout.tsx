@@ -9,13 +9,12 @@ interface MainLayoutProps {
 
 const MainLayout = ({ children }: MainLayoutProps) => {
   const location = useLocation();
-  const isDashboard = location.pathname.startsWith("/dashboard");
+  const isDashboard = location.pathname.startsWith('/dashboard');
+
   return (
-    <div className="relative flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen">
       {!isDashboard && <Navbar />}
-      <main className="flex-grow">
-        {children}
-      </main>
+      <main className="flex-grow">{children}</main>
       {!isDashboard && <Footer />}
     </div>
   );

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import {
   Navbar as HeroNavbar,
   NavbarBrand,
@@ -16,120 +16,118 @@ import {
   Avatar,
   Input,
 } from '@heroui/react';
-import { Logo, SearchIcon, UserIcon } from '../Icons';
+import { Search } from 'lucide-react';
+import { Logo } from '../Icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { ThemeSwitch } from '../theme-switch';
+import { cn } from '../../lib/utils';
+
+const navLinks = [
+  { label: 'Home', href: '/' },
+  { label: 'Events', href: '/events' },
+  { label: 'About', href: '/about' },
+];
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
   const { isAuthenticated, user, logout } = useAuth();
-
-  const menuItems = [
-    { label: 'Home', path: '/' },
-    { label: 'Events', path: '/events' },
-    { label: 'About', path: '/about' },
-  ];
-
-  const isActive = (path: string) => {
-    if (path === '/' && location.pathname !== '/') return false;
-    return location.pathname.startsWith(path);
-  };
 
   const handleLogout = () => {
     logout();
     navigate('/');
   };
 
-  const searchInput = (
+  const searchInput = (onSubmit?: () => void) => (
     <Input
       aria-label="Search events"
+      size="sm"
       classNames={{
-        inputWrapper: "bg-default-100/50 backdrop-blur-md border border-default-200 group-data-[focus=true]:bg-default-100",
-        input: "text-sm",
+        inputWrapper: 'bg-default-100 border-transparent',
+        input: 'text-sm',
       }}
       placeholder="Search events..."
-      startContent={
-        <SearchIcon className="text-default-400 pointer-events-none flex-shrink-0" />
-      }
+      startContent={<Search size={14} className="text-default-400" />}
       type="search"
       onKeyDown={(e) => {
         if (e.key === 'Enter') {
           navigate(`/events?search=${encodeURIComponent(e.currentTarget.value)}`);
+          onSubmit?.();
         }
       }}
     />
   );
 
   return (
-    <HeroNavbar 
-      maxWidth="xl" 
+    <HeroNavbar
+      maxWidth="xl"
       position="sticky"
-      className="bg-background/70 backdrop-blur-lg border-b border-default-200/50"
+      className="bg-background/80 backdrop-blur-md border-b border-divider"
       isMenuOpen={isMenuOpen}
       onMenuOpenChange={setIsMenuOpen}
     >
-      <NavbarContent className="basis-1/5 sm:basis-full" justify="start">
+      {/* Logo + nav links */}
+      <NavbarContent justify="start" className="gap-6">
         <NavbarMenuToggle className="sm:hidden" />
-        <NavbarBrand className="gap-3 max-w-fit">
-          <Link
-            className="flex justify-start items-center gap-2 group"
-            to="/"
-          >
-            <div className="p-1 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors duration-300">
-              <Logo />
+        <NavbarBrand>
+          <Link to="/" className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg gradient-primary flex items-center justify-center text-white">
+              <Logo size={18} />
             </div>
-            <p className="font-display font-bold text-inherit tracking-tight text-xl">EVENTIDE</p>
+            <span className="font-display font-semibold text-lg text-foreground hidden sm:block">
+              Eventide
+            </span>
           </Link>
         </NavbarBrand>
-        
-        <div className="hidden sm:flex gap-6 justify-start ml-8">
-          {menuItems.map((item) => (
-            <NavbarItem key={item.path} isActive={isActive(item.path)}>
-              <Link
-                to={item.path}
-                className={`font-medium transition-colors hover:text-primary ${
-                  isActive(item.path) ? 'text-primary' : 'text-foreground/80'
-                }`}
+        <div className="hidden md:flex items-center gap-1">
+          {navLinks.map((link) => (
+            <NavbarItem key={link.href}>
+              <NavLink
+                to={link.href}
+                end={link.href === '/'}
+                className={({ isActive }) =>
+                  cn(
+                    'px-3 py-2 text-sm font-medium rounded-lg transition-colors',
+                    isActive
+                      ? 'text-primary bg-primary/8'
+                      : 'text-default-600 hover:text-foreground hover:bg-default-100'
+                  )
+                }
               >
-                {item.label}
-              </Link>
+                {link.label}
+              </NavLink>
             </NavbarItem>
           ))}
         </div>
       </NavbarContent>
 
-      <NavbarContent className="hidden sm:flex" justify="center">
-        <NavbarItem className="w-full max-w-xs xl:max-w-md">
-          {searchInput}
+      {/* Search bar — desktop center */}
+      <NavbarContent justify="center" className="hidden sm:flex">
+        <NavbarItem className="w-full max-w-xs">
+          {searchInput()}
         </NavbarItem>
       </NavbarContent>
 
-      <NavbarContent className="hidden sm:flex basis-1/5 sm:basis-full" justify="end">
-        <NavbarItem className="hidden sm:flex gap-3">
+      {/* Right actions */}
+      <NavbarContent justify="end" className="gap-2">
+        <NavbarItem>
           <ThemeSwitch />
-          {!isAuthenticated ? (
-            <>
-              <Button
-                as={Link}
-                to="/login"
-                variant="light"
-                className="font-medium"
-              >
-                Sign In
+        </NavbarItem>
+        {!isAuthenticated ? (
+          <>
+            <NavbarItem className="hidden sm:flex">
+              <Button as={Link} to="/login" variant="ghost" size="sm" className="font-medium">
+                Sign in
               </Button>
-              <Button
-                as={Link}
-                to="/register"
-                color="primary"
-                variant="solid"
-                className="font-medium shadow-md shadow-primary/20"
-              >
-                Sign Up
+            </NavbarItem>
+            <NavbarItem className="hidden sm:flex">
+              <Button as={Link} to="/register" color="primary" size="sm" className="font-medium">
+                Get started
               </Button>
-            </>
-          ) : (
+            </NavbarItem>
+          </>
+        ) : (
+          <NavbarItem>
             <Dropdown placement="bottom-end">
               <DropdownTrigger>
                 <Avatar
@@ -139,13 +137,15 @@ const Navbar = () => {
                   color="primary"
                   name={user?.name || 'U'}
                   size="sm"
-                  icon={<UserIcon />}
                 />
               </DropdownTrigger>
               <DropdownMenu aria-label="Profile Actions" variant="flat">
-                <DropdownItem key="profile" className="h-14 gap-2" textValue="Signed in as">
-                  <p className="font-semibold text-xs text-default-500">Signed in as</p>
-                  <p className="font-semibold">{user?.email}</p>
+                <DropdownItem key="profile" className="h-14 gap-2" textValue={user?.email || ''}>
+                  <p className="text-xs text-default-500">Signed in as</p>
+                  <p className="font-semibold text-sm">{user?.email}</p>
+                  {user?.role && (
+                    <p className="text-xs text-primary capitalize">{user.role.toLowerCase()}</p>
+                  )}
                 </DropdownItem>
                 <DropdownItem key="dashboard" onClick={() => navigate('/dashboard')}>
                   Dashboard
@@ -161,69 +161,71 @@ const Navbar = () => {
                 </DropdownItem>
               </DropdownMenu>
             </Dropdown>
-          )}
-        </NavbarItem>
+          </NavbarItem>
+        )}
       </NavbarContent>
 
-      {/* Mobile Menu */}
-      <NavbarMenu className="bg-background/90 backdrop-blur-xl pt-6">
-        {searchInput}
-        <div className="mx-2 mt-6 flex flex-col gap-4">
-          {menuItems.map((item) => (
-            <NavbarMenuItem key={item.path} isActive={isActive(item.path)}>
-              <Link
-                to={item.path}
-                className={`w-full text-xl font-medium ${
-                  isActive(item.path) ? 'text-primary' : 'text-foreground/80'
-                }`}
+      {/* Mobile slide-in menu */}
+      <NavbarMenu className="bg-background/95 backdrop-blur-xl pt-6 gap-2">
+        {searchInput(() => setIsMenuOpen(false))}
+
+        <div className="mt-4 flex flex-col gap-1">
+          {navLinks.map((link) => (
+            <NavbarMenuItem key={link.href}>
+              <NavLink
+                to={link.href}
+                end={link.href === '/'}
+                className={({ isActive }) =>
+                  cn(
+                    'flex w-full items-center px-3 py-3 text-base font-medium rounded-xl transition-colors min-h-[48px]',
+                    isActive
+                      ? 'text-primary bg-primary/8'
+                      : 'text-default-600 hover:text-foreground hover:bg-default-100'
+                  )
+                }
+                onClick={() => setIsMenuOpen(false)}
+              >
+                {link.label}
+              </NavLink>
+            </NavbarMenuItem>
+          ))}
+        </div>
+
+        <div className="h-px w-full bg-divider my-2" />
+
+        {!isAuthenticated ? (
+          <div className="flex flex-col gap-2">
+            <Button as={Link} to="/login" variant="flat" className="w-full font-medium" onClick={() => setIsMenuOpen(false)}>
+              Sign In
+            </Button>
+            <Button as={Link} to="/register" color="primary" className="w-full font-medium" onClick={() => setIsMenuOpen(false)}>
+              Get Started
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {[
+              { to: '/dashboard', label: 'Dashboard' },
+              { to: '/dashboard/my-tickets', label: 'My Tickets' },
+              { to: '/dashboard/saved-events', label: 'Saved Events' },
+            ].map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className="flex w-full items-center px-3 py-3 text-base font-medium text-default-600 hover:text-foreground hover:bg-default-100 rounded-xl min-h-[48px] transition-colors"
                 onClick={() => setIsMenuOpen(false)}
               >
                 {item.label}
-              </Link>
-            </NavbarMenuItem>
-          ))}
-          
-          <div className="h-px w-full bg-default-200 my-2" />
-          
-          {!isAuthenticated ? (
-            <div className="flex flex-col gap-3">
-              <NavbarMenuItem>
-                <Button as={Link} to="/login" variant="flat" className="w-full font-medium" onClick={() => setIsMenuOpen(false)}>
-                  Sign In
-                </Button>
-              </NavbarMenuItem>
-              <NavbarMenuItem>
-                <Button as={Link} to="/register" color="primary" className="w-full font-medium" onClick={() => setIsMenuOpen(false)}>
-                  Sign Up
-                </Button>
-              </NavbarMenuItem>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              <NavbarMenuItem>
-                <Link to="/dashboard" className="w-full text-lg font-medium text-foreground/80 hover:text-primary" onClick={() => setIsMenuOpen(false)}>
-                  Dashboard
-                </Link>
-              </NavbarMenuItem>
-              <NavbarMenuItem>
-                <Link to="/dashboard/my-tickets" className="w-full text-lg font-medium text-foreground/80 hover:text-primary" onClick={() => setIsMenuOpen(false)}>
-                  My Tickets
-                </Link>
-              </NavbarMenuItem>
-              <NavbarMenuItem>
-                <button
-                  onClick={() => {
-                    handleLogout();
-                    setIsMenuOpen(false);
-                  }}
-                  className="w-full text-lg text-left font-medium text-danger"
-                >
-                  Sign Out
-                </button>
-              </NavbarMenuItem>
-            </div>
-          )}
-        </div>
+              </NavLink>
+            ))}
+            <button
+              onClick={() => { handleLogout(); setIsMenuOpen(false); }}
+              className="flex w-full items-center px-3 py-3 text-base font-medium text-danger hover:bg-danger/8 rounded-xl min-h-[48px] text-left transition-colors"
+            >
+              Sign Out
+            </button>
+          </div>
+        )}
       </NavbarMenu>
     </HeroNavbar>
   );
