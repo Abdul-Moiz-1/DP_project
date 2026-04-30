@@ -1,58 +1,79 @@
-// src/components/Event/EventInfoCard.tsx
+import { Chip } from '@heroui/react';
+import { Calendar, Clock, Users } from 'lucide-react';
+import type { ReactNode } from 'react';
 
-import { Card, CardBody, Button, Divider, Progress } from '@heroui/react';
-import { CalendarIcon, LocationIcon, TicketIcon } from '../Icons';
-
-
-
-interface EventInfoCardProps {
-  date: Date | string;
-  endDate?: Date | string;
-  location: string;
-  address?: string;
-  availableTickets: number;
-  totalTickets: number;
-}
-
-
-
-
-export default function EventInfoCard({ date, endDate, location, address, availableTickets, totalTickets }: EventInfoCardProps) {
-  const soldPercent = ((totalTickets - availableTickets) / totalTickets) * 100;
+function InfoPill({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+}) {
   return (
-    <Card>
-      <CardBody className="space-y-4">
-        <div className="flex items-start gap-3">
-          <CalendarIcon />
-          <div>
-            <p className="font-semibold">Date & Time</p>
-            <p className="text-default-600">{new Date(date).toLocaleString()}</p>
-            {endDate && <p className="text-sm text-default-500">Ends: {new Date(endDate).toLocaleString()}</p>}
-          </div>
-        </div>
-        <Divider />
-        <div className="flex items-start gap-3">
-          <LocationIcon />
-          <div>
-            <p className="font-semibold">Location</p>
-            <p className="text-default-600">{location}</p>
-            {address && <p className="text-sm text-default-500">{address}</p>}
-          </div>
-        </div>
-        <Divider />
-        <div className="flex items-start gap-3">
-          <TicketIcon />
-          <div className="flex-1">
-            <p className="font-semibold">Availability</p>
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-default-600">{availableTickets} of {totalTickets} tickets remaining</span>
-              <span className="text-sm font-semibold">{soldPercent.toFixed(0)}% sold</span>
-            </div>
-            <Progress value={soldPercent} className="max-w-md" />
-          </div>
-        </div>
-      </CardBody>
-    </Card>
+    <div className="card-base p-4">
+      <div className="flex items-center gap-1.5 text-default-400 mb-1">
+        <Icon size={13} />
+        <span className="text-xs font-medium uppercase tracking-wider">{label}</span>
+      </div>
+      <p className="font-semibold text-sm text-foreground leading-snug">{value}</p>
+    </div>
   );
 }
 
+interface EventInfoCardProps {
+  event: {
+    startDate: string | Date;
+    endDate: string | Date;
+    capacity: number;
+    bookings?: number | null;
+    description: string;
+    categories: { id: number; name: string }[];
+  };
+}
+
+export default function EventInfoCard({ event }: EventInfoCardProps) {
+  const start = new Date(event.startDate);
+  const end   = new Date(event.endDate);
+  const sold  = event.bookings ?? 0;
+
+  const dateStr  = start.toLocaleDateString(undefined, {
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+  });
+  const startTime = start.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  const endTime   = end.toLocaleTimeString(undefined,   { hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <div className="space-y-6">
+      {/* Quick-facts grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <InfoPill icon={Calendar} label="Date"     value={dateStr} />
+        <InfoPill icon={Clock}    label="Time"     value={`${startTime} – ${endTime}`} />
+        <InfoPill icon={Users}    label="Capacity" value={`${sold.toLocaleString()} / ${event.capacity.toLocaleString()}`} />
+      </div>
+
+      {/* About */}
+      <section>
+        <h2 className="font-display text-xl font-semibold mb-3">About this event</h2>
+        <p className="text-default-600 leading-relaxed whitespace-pre-line">
+          {event.description}
+        </p>
+      </section>
+
+      {/* Categories */}
+      {event.categories.length > 0 && (
+        <section>
+          <h3 className="text-sm font-medium text-default-400 mb-2">Categories</h3>
+          <div className="flex flex-wrap gap-2">
+            {event.categories.map((c) => (
+              <Chip key={c.id} variant="flat" color="primary" size="sm">
+                {c.name}
+              </Chip>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}

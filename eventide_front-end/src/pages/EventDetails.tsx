@@ -1,78 +1,57 @@
-
-
-// src/pages/EventDetails.tsx
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  Button,
-  Divider,
-  Tabs,
-  Tab,
-} from '@heroui/react';
-import { useAuth } from '../contexts/AuthContext';
-
-import HeroGallery from '../components/events/HeroGallery';
-import EventHeader from '../components/events/EventHeader';
-import EventInfoCard from '../components/events/EventInfoCard';
-import TicketsTab from '../components/events/TicketsTab';
-import BookingModal from '../components/events/BookingModal';
-import ReviewsTab from '../components/events/ReviewsTab';
-import OrganizerCard from '../components/events/OrganizerCard';
-import SidebarBookingCard from '../components/events/SidebarBookingCard';
-import { EventMap } from '../components/events/EventMap';
-import { EventLocationMap } from '../components/events/EventLocationMap';
-import ShareButton from '../components/events/ShareButton';
-import AddToCalendar from '../components/events/AddToCalendar';
-import { Review } from '@/api/types';
 import { LoaderCircle } from 'lucide-react';
 import { api } from '@/api/api';
+import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '@/components/toast-provider';
-import { EventResponseDto } from '@/lib/dtos';
 import { eventService } from '@/services/eventService';
+import { EventResponseDto } from '@/lib/dtos';
+import { Review } from '@/api/types';
 
-
-interface ReviewStats {
-  averageRating: number;
-  totalReviews: number;
-  ratings: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
-}
+import EventHeader        from '../components/events/EventHeader';
+import EventInfoCard      from '../components/events/EventInfoCard';
+import BookingModal       from '../components/events/BookingModal';
+import ReviewsTab         from '../components/events/ReviewsTab';
+import OrganizerCard      from '../components/events/OrganizerCard';
+import SidebarBookingCard from '../components/events/SidebarBookingCard';
+import { EventLocationMap } from '../components/events/EventLocationMap';
+import ShareButton        from '../components/events/ShareButton';
+import AddToCalendar      from '../components/events/AddToCalendar';
 
 interface ReviewsResponse {
   items: Review[];
   total: number;
-  page: number;
-  limit: number;
-  pages: number;
-  stats: ReviewStats;
+  stats: { averageRating: number; totalReviews: number; ratings: Record<string, number> };
 }
 
 const EventDetails = () => {
-  const { id } = useParams();
+  const { id }   = useParams();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const { warning, success } = useToast();
 
-  // state
-  const [event, setEvent] = useState<EventResponseDto | null>(null);
-  const [reviewsData, setReviewsData] = useState<ReviewsResponse | null>(null)
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [selectedImage, setSelectedImage] = useState(0);
-  const [bookingOpen, setBookingOpen] = useState(false);
-  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
-  const [availableTickets, setAvailableTickets] = useState<number | 0>(0)
-  const [loading, setLoading] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
-  const [savingWishlist, setSavingWishlist] = useState(false);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followLoading, setFollowLoading] = useState(false);
+  const eventId = parseInt(id || '0', 10);
 
-  const eventId: number = parseInt(id || '0', 10);
+  const [event,        setEvent]        = useState<EventResponseDto | null>(null);
+  const [reviewsData,  setReviewsData]  = useState<ReviewsResponse | null>(null);
+  const [reviews,      setReviews]      = useState<Review[]>([]);
+  const [loading,      setLoading]      = useState(false);
+  const [availableSpots, setAvailableSpots] = useState(0);
 
-  const { warning, success } = useToast()
+  const [isSaved,        setIsSaved]        = useState(false);
+  const [savingWishlist, setSavingWishlist]  = useState(false);
+  const [isFollowing,    setIsFollowing]    = useState(false);
+  const [followLoading,  setFollowLoading]  = useState(false);
+
+  const [bookingOpen,     setBookingOpen]     = useState(false);
+  const [bookingTicketId, setBookingTicketId] = useState<number | null>(null);
+  const [bookingQty,      setBookingQty]      = useState(1);
+  const [bookingLoading,  setBookingLoading]  = useState(false);
+  const [bookingSuccess,  setBookingSuccess]  = useState(false);
 
   useEffect(() => {
     if (!eventId) return;
     setLoading(true);
-
     const fetchAll = async () => {
       try {
         const [eventRes, reviewsRes] = await Promise.all([
@@ -81,86 +60,66 @@ const EventDetails = () => {
         ]);
         const eventData: EventResponseDto = eventRes.data;
         setEvent(eventData);
-        setAvailableTickets(eventData.capacity - (eventData.bookings ?? 0));
+        setAvailableSpots(eventData.capacity - (eventData.bookings ?? 0));
         setReviewsData(reviewsRes.data || null);
         setReviews(reviewsRes.data?.items || []);
 
         if (isAuthenticated && eventData.organizer?.id) {
-          const [savedRes, following] = await Promise.allSettled([
+          const [savedRes, followingRes] = await Promise.allSettled([
             eventService.checkEventSaved(eventId),
             eventService.fetchFollowing(),
           ]);
-
-          if (savedRes.status === 'fulfilled') {
-            setIsSaved(savedRes.value.isSaved);
-          }
-
-          if (following.status === 'fulfilled') {
+          if (savedRes.status === 'fulfilled')     setIsSaved(savedRes.value.isSaved);
+          if (followingRes.status === 'fulfilled') {
             setIsFollowing(
-              following.value.some((f: any) => f.id === eventData.organizer.id),
+              followingRes.value.some((f: any) => f.id === eventData.organizer.id),
             );
           }
         }
-      } catch (error) {
-        console.error('Error loading event details:', error);
+      } catch {
+        /* silent — user sees empty UI */
       } finally {
         setLoading(false);
       }
     };
-
     fetchAll();
   }, [eventId, isAuthenticated]);
 
-
-
-
-  const handleBookClick = () => {
+  const handleBookClick = (ticketId: number, qty: number) => {
     if (!isAuthenticated) {
       navigate('/login', { state: { from: `/events/${id}` } });
       return;
     }
+    setBookingTicketId(ticketId);
+    setBookingQty(qty);
+    setBookingSuccess(false);
     setBookingOpen(true);
   };
 
-  const handlePurchase = async (ticketId: string) => {
-    if (!event) return;
-
+  const handlePurchase = async () => {
+    if (!event || bookingTicketId === null) return;
+    setBookingLoading(true);
     try {
-      setLoading(true);
-      const response = await api.post(`/bookings`, {
-        eventId: event.id,
-        ticketId: parseInt(ticketId),
-      });
-
-      if (response.status < 200 || response.status >= 300) {
-        throw new Error('Failed to create booking');
+      for (let i = 0; i < bookingQty; i++) {
+        await api.post('/bookings', { eventId: event.id, ticketId: bookingTicketId });
       }
-
-      const data = response.data;
-      setBookingOpen(false);
-      navigate('/dashboard/my-tickets', {
-        state: {
-          bookingSuccess: true,
-          bookingId: data.id
-        }
-      });
+      setBookingSuccess(true);
+      setAvailableSpots((prev) => Math.max(0, prev - bookingQty));
     } catch (error: any) {
-      console.error('Error creating booking:', error?.response?.data.message);
-      setBookingOpen(false)
-      warning(error?.response.data.message)
+      setBookingOpen(false);
+      warning(error?.response?.data?.message ?? 'Booking failed. Please try again.');
     } finally {
-      setLoading(false);
+      setBookingLoading(false);
     }
   };
 
   const handleSubmitReview = async (rating: number, comment: string) => {
     setLoading(true);
     try {
-      await api.post(`/reviews`, { eventId, rating, comment });
-      // Refresh reviews after submission
-      const reviewsRes = await api.get(`/reviews/event/${eventId}`);
-      setReviewsData(reviewsRes.data || null);
-      setReviews(reviewsRes.data?.items || []);
+      await api.post('/reviews', { eventId, rating, comment });
+      const res = await api.get(`/reviews/event/${eventId}`);
+      setReviewsData(res.data || null);
+      setReviews(res.data?.items || []);
       success('Review submitted!');
     } catch (error: any) {
       warning(error?.response?.data?.message || 'Failed to submit review');
@@ -177,7 +136,6 @@ const EventDetails = () => {
       if (isFollowing) {
         await eventService.unfollowOrganizer(event.organizer.id);
         setIsFollowing(false);
-        success('Unfollowed organizer');
       } else {
         await eventService.followOrganizer(event.organizer.id);
         setIsFollowing(true);
@@ -200,7 +158,6 @@ const EventDetails = () => {
       if (isSaved) {
         await eventService.unsaveEvent(eventId);
         setIsSaved(false);
-        success('Removed from wishlist');
       } else {
         await eventService.saveEvent(eventId);
         setIsSaved(true);
@@ -213,140 +170,118 @@ const EventDetails = () => {
     }
   };
 
-  const handleRequireLogin = () => {
-    navigate('/login');
-  };
+  const bookingTicketObj = event?.tickets?.find((t) => t.id === bookingTicketId) ?? null;
 
   return (
     <div className="min-h-screen bg-background">
-      {loading && (
+      {/* Initial loading overlay */}
+      {loading && !event && (
         <div className="fixed inset-0 flex items-center justify-center bg-background/60 backdrop-blur-sm z-50">
-          <LoaderCircle className="animate-spin text-primary" size={48} />
+          <LoaderCircle className="animate-spin text-primary" size={40} />
         </div>
       )}
-      <HeroGallery
-        images={event?.images.map(img => img.imageUrl) || []}
-        selectedIndex={selectedImage}
-        onSelect={setSelectedImage}
+
+      {/* Full-width hero (image + overlay title) */}
+      <EventHeader
+        images={event?.images.map((img) => img.imageUrl) || []}
+        title={event?.name || ''}
+        categories={event?.categories || []}
+        status={(event as any)?.status}
+        startDate={event ? String(event.startDate) : new Date().toISOString()}
+        location={{
+          city:    event?.location?.city    || '',
+          country: event?.location?.country || '',
+        }}
         onBack={() => navigate(-1)}
       />
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-6">
-            <EventHeader
-              title={event ? event.name : 'N/A'}
-              category={event?.categories.map(cat => cat.name).join(', ') || ''}
-              rating={reviewsData?.stats?.averageRating ?? 0}
-              reviewsCount={reviewsData?.stats?.totalReviews ?? 0}
-              attendees={event?.bookings || 0}
-              isVerified={true}
-            />
+      <div className="container-app py-8">
+        <div className="flex flex-col lg:flex-row gap-8">
 
-            <div className="flex gap-3">
+          {/* ── Left: main content ── */}
+          <div className="flex-1 min-w-0 space-y-10">
+            {/* Quick actions row */}
+            <div className="flex flex-wrap gap-3">
               <ShareButton eventName={event?.name || ''} eventUrl={`/events/${id}`} />
               {event && (
                 <AddToCalendar
                   eventName={event.name}
                   description={event.description}
-                  startDate={event.startDate.toString()}
-                  endDate={event.endDate.toString()}
+                  startDate={String(event.startDate)}
+                  endDate={String(event.endDate)}
                   location={`${event.location.address}, ${event.location.city}`}
                 />
               )}
             </div>
 
-            <Divider />
+            {/* Event info + description + categories */}
+            {event && <EventInfoCard event={event} />}
 
-            <EventInfoCard
-              date={event ? event.startDate : 'Start Date'}
-              endDate={event ? event.endDate : 'End Date'}
-              location={event ? event.location.city : 'Location'}
-              address={event ? event.location.address : 'Address'}
-              availableTickets={availableTickets}
-              totalTickets={event?.capacity || 0}
-            />
+            {/* Location map */}
+            {event?.location?.latitude && event?.location?.longitude && (
+              <section>
+                <h2 className="font-display text-xl font-semibold mb-4">Location</h2>
+                <EventLocationMap eventId={event.id} location={event.location} />
+              </section>
+            )}
 
-            <Tabs aria-label="Event information" size="lg" color="primary">
-              <Tab key="about" title="About">
-                <div className="pt-4">
-                  <div className="prose dark:prose-invert max-w-none whitespace-pre-line text-default-600 leading-relaxed">
-                    {event && event.description}
-                  </div>
-                </div>
-              </Tab>
+            {/* Reviews */}
+            <section>
+              <h2 className="font-display text-xl font-semibold mb-4">
+                Reviews
+                {reviewsData?.stats?.totalReviews
+                  ? ` (${reviewsData.stats.totalReviews})`
+                  : ''}
+              </h2>
+              <ReviewsTab
+                reviews={reviews}
+                onSubmitReview={handleSubmitReview}
+                isUserAuthenticated={isAuthenticated}
+                onRequireLogin={() => navigate('/login')}
+              />
+            </section>
+          </div>
 
-              <Tab key="tickets" title="Tickets">
-                <div className="pt-4">
-                  <TicketsTab
-                    ticketTypes={event ? event.tickets : []}
-                    selectedTicketId={selectedTicketId}
-                    onSelectTicket={setSelectedTicketId}
-                  />
-                </div>
-              </Tab>
+          {/* ── Right: sticky sidebar ── */}
+          <aside className="lg:w-80 flex-none">
+            <div className="sticky top-20 space-y-4">
+              <SidebarBookingCard
+                tickets={event?.tickets || []}
+                availableSpots={availableSpots}
+                capacity={event?.capacity || 0}
+                eventEndDate={event ? String(event.endDate) : new Date().toISOString()}
+                onBook={handleBookClick}
+                isSaved={isSaved}
+                savingWishlist={savingWishlist}
+                onWishlist={handleWishlist}
+              />
 
-              {event?.location?.latitude && event?.location?.longitude && (
-                <Tab key="location" title="Location">
-                  <div className="pt-4">
-                    <EventLocationMap
-                      eventId={event.id}
-                      location={event.location}
-                    />
-                  </div>
-                </Tab>
+              {event?.organizer && (
+                <OrganizerCard
+                  organizer={event.organizer}
+                  isFollowing={isFollowing}
+                  followLoading={followLoading}
+                  onFollow={handleFollowOrganizer}
+                />
               )}
-
-              <Tab key="reviews" title={`Reviews (${reviews.length})`}>
-                <div className="pt-4">
-                  <ReviewsTab
-                    reviews={reviews}
-                    onSubmitReview={handleSubmitReview}
-                    isUserAuthenticated={isAuthenticated}
-                    onRequireLogin={handleRequireLogin}
-                  />
-                </div>
-              </Tab>
-            </Tabs>
-
-            <OrganizerCard
-              avatar={event ? event.organizer.name : 'Organizer'}
-              name={event?.organizer?.organizerProfile?.organizationName || event?.organizer.name || 'Organizer'}
-              bio={`Organized by ${event?.organizer.name || 'Unknown'}`}
-              isVerified={true}
-              isFollowing={isFollowing}
-              followLoading={followLoading}
-              onFollow={handleFollowOrganizer}
-            />
-          </div>
-
-          <div className="lg:col-span-1">
-            <SidebarBookingCard
-              price={event?.tickets ? Math.min(...event.tickets.map(t => t.price)) : 0}
-              availableTickets={availableTickets}
-              category={event?.categories ? event.categories.map(cat => cat.name).join(', ') : 'N/A'}
-              rating={reviewsData ? reviewsData.stats.averageRating : 0}
-              onBook={handleBookClick}
-              endDate={event ? event.endDate : 'Date not found'}
-              onWishlist={handleWishlist}
-              isSaved={isSaved}
-              savingWishlist={savingWishlist}
-            />
-          </div>
+            </div>
+          </aside>
         </div>
       </div>
 
+      {/* Booking confirmation modal */}
       <BookingModal
         isOpen={bookingOpen}
-        onClose={() => setBookingOpen(false)}
-        ticketTypes={event?.tickets || []}
-        onPurchase={handlePurchase}
+        onClose={() => { setBookingOpen(false); setBookingSuccess(false); }}
+        ticket={bookingTicketObj}
+        quantity={bookingQty}
+        eventName={event?.name || ''}
+        onConfirm={handlePurchase}
+        isLoading={bookingLoading}
+        isSuccess={bookingSuccess}
       />
     </div>
   );
-
-}
-
-
+};
 
 export default EventDetails;

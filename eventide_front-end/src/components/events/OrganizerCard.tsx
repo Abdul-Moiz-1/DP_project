@@ -1,62 +1,48 @@
-import React from 'react';
-import { Card, CardBody, Avatar, Chip, Button } from '@heroui/react';
+import { Avatar, Button } from '@heroui/react';
 
 interface OrganizerCardProps {
-  avatar: string;
-  name: string;
-  bio?: string;
-  isVerified?: boolean;
+  organizer: {
+    id: number;
+    name: string;
+    organizerProfile?: { organizationName?: string };
+  };
   isFollowing?: boolean;
   followLoading?: boolean;
   onFollow?: () => void;
 }
 
-const OrganizerCard: React.FC<OrganizerCardProps> = ({
-  avatar,
-  name,
-  bio,
-  isVerified = false,
+export default function OrganizerCard({
+  organizer,
   isFollowing = false,
   followLoading = false,
   onFollow,
-}) => {
+}: OrganizerCardProps) {
+  const orgName = organizer.organizerProfile?.organizationName;
+
   return (
-    <Card>
-      <CardBody>
-        <h3 className="font-bold text-lg mb-4">Organized By</h3>
-        <div className="flex items-center gap-4">
-          <Avatar
-            name={name}
-            size="lg"
-            isBordered
-            color="primary"
-          />
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <p className="font-semibold text-lg">{name}</p>
-              {isVerified && (
-                <Chip size="sm" color="success" variant="flat">
-                  ✓ Verified
-                </Chip>
-              )}
-            </div>
-            {bio && <p className="text-sm text-default-500">{bio}</p>}
-          </div>
-          <Button
-            variant={isFollowing ? 'solid' : 'bordered'}
-            color={isFollowing ? 'primary' : 'default'}
-            size="sm"
-            isLoading={followLoading}
-            onPress={onFollow}
-          >
-            {isFollowing ? 'Following' : 'Follow'}
-          </Button>
+    <div className="card-base p-4">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-default-400 mb-3">
+        Organizer
+      </h3>
+      <div className="flex items-center gap-3 mb-3">
+        <Avatar name={organizer.name} size="md" color="primary" />
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm truncate">{organizer.name}</p>
+          {orgName && (
+            <p className="text-xs text-default-400 truncate">{orgName}</p>
+          )}
         </div>
-      </CardBody>
-    </Card>
+      </div>
+      <Button
+        variant={isFollowing ? 'solid' : 'bordered'}
+        color={isFollowing ? 'primary' : 'default'}
+        size="sm"
+        className="w-full"
+        isLoading={followLoading}
+        onPress={onFollow}
+      >
+        {isFollowing ? 'Following' : 'Follow organizer'}
+      </Button>
+    </div>
   );
-};
-
-export default OrganizerCard;
-
-
+}

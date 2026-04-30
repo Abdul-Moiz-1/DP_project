@@ -1,69 +1,122 @@
-// src/components/Event/BookingModal.tsx
-import React, { useState } from 'react';
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Divider, Input } from '@heroui/react';
-import TicketCard from './TicketsCard';
-
+import { Modal, ModalContent, ModalBody, ModalHeader, ModalFooter, Button } from '@heroui/react';
+import { CheckCircle, Calendar, Ticket } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface TicketType {
   id: number;
   name: string;
   price: number;
-  salesStartDate: Date | string;
-  salesEndDate: Date | string;
 }
 
 interface BookingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  ticketTypes: TicketType[];
-  onPurchase: (ticketId: string) => void;
+  ticket: TicketType | null;
+  quantity: number;
+  eventName: string;
+  onConfirm: () => void;
+  isLoading?: boolean;
+  isSuccess?: boolean;
 }
 
-
-
-
-export default function BookingModal({ isOpen, onClose, ticketTypes, onPurchase }: BookingModalProps) {
-  const [selectedTicket, setSelectedTicket] = useState<string | null>(null);
-  const [quantity, setQuantity] = useState(1);
-  const ticket = ticketTypes.find(t => t.id.toString() === selectedTicket);
-
-  const subtotal = (ticket?.price || 0) * quantity;
-  const total = subtotal + 5;
+export default function BookingModal({
+  isOpen,
+  onClose,
+  ticket,
+  quantity,
+  eventName,
+  onConfirm,
+  isLoading = false,
+  isSuccess = false,
+}: BookingModalProps) {
+  const total  = (ticket?.price ?? 0) * quantity;
+  const isFree = ticket?.price === 0;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="2xl">
+    <Modal isOpen={isOpen} onClose={onClose} size="sm">
       <ModalContent>
-        <ModalHeader><h2 className="text-2xl font-bold">Book Your Tickets</h2></ModalHeader>
-        <ModalBody>
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm text-default-500 mb-2">Select Ticket Type</p>
-              {ticketTypes.filter(t => t.salesStartDate <  t.salesEndDate).map(t => (
-                <TicketCard key={t.id} {...t} selected={selectedTicket===t.id.toString()} onSelect={setSelectedTicket} available={100} />
-              ))}
+        {isSuccess ? (
+          <ModalBody className="py-8 flex flex-col items-center text-center">
+            <div className="rounded-full bg-success/10 p-4 mb-4">
+              <CheckCircle className="h-10 w-10 text-success" />
             </div>
-
-            {selectedTicket && (
-              <>
-                {/* <div>
-                  <label className="block text-sm font-medium mb-2">Number of Tickets</label>
-                  <Input type="number" min={1} max={10} value={quantity.toString()} onChange={(e:any) => setQuantity(Math.max(1, Number(e.target.value)||1))} />
-                </div> */}
-
-                <div className="p-4 bg-default-100 rounded-xl">
-                  <div className="flex justify-between mb-2"><span>Subtotal</span><span className="font-semibold">${subtotal.toFixed(2)}</span></div>
-                  <div className="flex justify-between mb-2"><span>Service Fee</span><span className="font-semibold">$5.00</span></div>
-                  <Divider className="my-2" />
-                  <div className="flex justify-between text-lg font-bold"><span>Total</span><span className="text-primary">${total.toFixed(2)}</span></div>
+            <h2 className="font-display text-xl font-bold mb-2">Booking Confirmed!</h2>
+            <p className="text-sm text-default-500 mb-6 max-w-xs">
+              Your spot has been reserved for <strong>{eventName}</strong>.
+            </p>
+            <Button
+              as={Link}
+              to="/dashboard/my-tickets"
+              color="primary"
+              className="w-full font-semibold"
+              onPress={onClose}
+            >
+              View my tickets
+            </Button>
+            <button
+              onClick={onClose}
+              className="mt-2 text-sm text-default-400 hover:text-foreground transition-colors"
+            >
+              Stay on this page
+            </button>
+          </ModalBody>
+        ) : (
+          <>
+            <ModalHeader>
+              <h2 className="font-display font-semibold text-lg">Confirm Booking</h2>
+            </ModalHeader>
+            <ModalBody>
+              <div className="space-y-4">
+                <div className="card-base p-4 space-y-3">
+                  <div className="flex items-start gap-2.5">
+                    <Calendar size={15} className="text-default-400 mt-0.5 flex-none" />
+                    <div>
+                      <p className="text-xs text-default-400">Event</p>
+                      <p className="font-semibold text-sm leading-snug">{eventName}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <Ticket size={15} className="text-default-400 mt-0.5 flex-none" />
+                    <div>
+                      <p className="text-xs text-default-400">Ticket type</p>
+                      <p className="font-semibold text-sm">{ticket?.name}</p>
+                    </div>
+                  </div>
+                  <div className="h-px bg-divider" />
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-default-500">
+                      {isFree ? 'Free' : `$${ticket?.price}`} × {quantity}
+                    </span>
+                    <span className="font-bold text-lg">
+                      {isFree ? 'Free' : `$${total}`}
+                    </span>
+                  </div>
                 </div>
-              </>
-            )}
-          </div>
-        </ModalBody>
-        <ModalFooter>
-          <Button variant="light" onPress={onClose}>Cancel</Button>
-          <Button color="primary" onPress={() => { if (selectedTicket) onPurchase(selectedTicket); }} isDisabled={!selectedTicket}>Proceed to Checkout</Button>
-        </ModalFooter>
+                <p className="text-xs text-default-400 text-center">
+                  By confirming you agree to our Terms of Service.
+                </p>
+              </div>
+            </ModalBody>
+            <ModalFooter className="gap-2">
+              <Button
+                variant="flat"
+                onPress={onClose}
+                isDisabled={isLoading}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                color="primary"
+                onPress={onConfirm}
+                isLoading={isLoading}
+                className="flex-1 font-semibold"
+              >
+                Confirm Booking
+              </Button>
+            </ModalFooter>
+          </>
+        )}
       </ModalContent>
     </Modal>
   );
