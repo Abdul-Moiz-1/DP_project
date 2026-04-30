@@ -1,212 +1,262 @@
-
-
-
-// src/pages/Register.tsx - SIMPLIFIED VERSION
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Card, CardHeader, CardBody, CardFooter, Button, Progress } from '@heroui/react';
+import { Progress } from '@heroui/react';
+import { Button } from '@heroui/react';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types/user.types';
+import { Logo } from '../components/Icons';
 import Step1BasicInfo from '../components/Register/Step1BasicInfo';
 import Step2AccountType from '../components/Register/Step2AccountType';
 import Step3Organization from '../components/Register/Step3Organization';
 import InfoModal from '../components/Register/InfoModal';
 
-
+const STEP_LABELS = ['Your info', 'Account type', 'Organization'];
 
 const Register = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { register, isAuthenticated } = useAuth();
 
-
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/');
-    }
+    if (isAuthenticated) navigate('/');
   }, [isAuthenticated, navigate]);
-  const initialRole = searchParams.get('type') === 'organizer' ? UserRole.ORGANIZER : UserRole.USER;
 
-  const [step, setStep] = useState(1);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [createNewOrg, setCreateNewOrg] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const initialRole =
+    searchParams.get('type') === 'organizer' ? UserRole.ORGANIZER : UserRole.USER;
+
+  const [step,           setStep]           = useState(1);
+  const [showPassword,   setShowPassword]   = useState(false);
+  const [showModal,      setShowModal]      = useState(false);
+  const [createNewOrg,   setCreateNewOrg]   = useState(false);
+  const [isLoading,      setIsLoading]      = useState(false);
+  const [errors,         setErrors]         = useState<Record<string, string>>({});
 
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    role: initialRole,
-    agreeToTerms: false,
+    name:             '',
+    email:            '',
+    password:         '',
+    confirmPassword:  '',
+    role:             initialRole,
+    agreeToTerms:     false,
     organizationName: '',
-    address: '',
-    city: '',
-    state: '',
-    country: '',
-    zipCode: '',
+    address:          '',
+    city:             '',
+    state:            '',
+    country:          '',
+    zipCode:          '',
   });
 
   const totalSteps = formData.role === UserRole.ORGANIZER ? 3 : 2;
 
   const handleChange = (field: string, value: string | boolean) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: '' }));
+    setFormData((p) => ({ ...p, [field]: value }));
+    if (errors[field]) setErrors((p) => ({ ...p, [field]: '' }));
   };
 
   const validate = () => {
-    const newErrors: Record<string, string> = {};
-
+    const e: Record<string, string> = {};
     if (step === 1) {
-      if (!formData.name.trim()) newErrors.name = 'Name is required';
-      if (!formData.email) newErrors.email = 'Email is required';
-      else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Invalid email';
-      if (!formData.password) newErrors.password = 'Password is required';
-      else if (formData.password.length < 8) newErrors.password = 'Min 8 characters';
-      if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
+      if (!formData.name.trim())                      e.name            = 'Name is required';
+      if (!formData.email)                            e.email           = 'Email is required';
+      else if (!/\S+@\S+\.\S+/.test(formData.email)) e.email           = 'Enter a valid email';
+      if (!formData.password)                         e.password        = 'Password is required';
+      else if (formData.password.length < 8)          e.password        = 'Min 8 characters';
+      if (formData.password !== formData.confirmPassword) e.confirmPassword = 'Passwords do not match';
     }
-
     if (step === 2) {
-      if (!formData.role) newErrors.role = 'Select a role';
-      if (!formData.agreeToTerms) newErrors.agreeToTerms = 'You must agree to terms';
+      if (!formData.role)        e.role        = 'Select a role';
+      if (!formData.agreeToTerms) e.agreeToTerms = 'You must agree to the terms';
     }
-
-    if (step === 3) {
-      if (createNewOrg) {
-        if (!formData.organizationName.trim()) newErrors.organizationName = 'Organization name required';
-        if (!formData.address) newErrors.address = 'Address is required';
-        if (!formData.city) newErrors.city = 'City is required';
-        if (!formData.state) newErrors.state = 'State is required';
-        if (!formData.country) newErrors.country = 'Country is required';
-        if (!formData.zipCode) newErrors.zipCode = 'Zip Code is required';
-      }
+    if (step === 3 && createNewOrg) {
+      if (!formData.organizationName.trim()) e.organizationName = 'Organization name required';
+      if (!formData.address)  e.address  = 'Address is required';
+      if (!formData.city)     e.city     = 'City is required';
+      if (!formData.state)    e.state    = 'State is required';
+      if (!formData.country)  e.country  = 'Country is required';
+      if (!formData.zipCode)  e.zipCode  = 'Zip code is required';
     }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleNext = async () => {
-    if (!validate()) return;
-
-    if (step === 2 && formData.role === UserRole.USER) {
-      await handleSubmit();
-    } else if (step === totalSteps) {
-      await handleSubmit();
-    } else {
-      setStep(step + 1);
-    }
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      const isOrganizer = formData.role === UserRole.ORGANIZER && createNewOrg;
+      const isOrg = formData.role === UserRole.ORGANIZER && createNewOrg;
       await register({
-        name: formData.name,
-        email: formData.email,
+        name:     formData.name,
+        email:    formData.email,
         password: formData.password,
-        organizerProfile: isOrganizer ? {
+        organizerProfile: isOrg ? {
           organizationName: formData.organizationName,
-          address: formData.address,
-          city: formData.city,
-          state: formData.state,
-          country: formData.country,
-          zipCode: formData.zipCode,
+          address:          formData.address,
+          city:             formData.city,
+          state:            formData.state,
+          country:          formData.country,
+          zipCode:          formData.zipCode,
         } : undefined,
       });
-    } catch (error) {
-      setErrors({ submit: 'Registration failed' });
+    } catch {
+      setErrors({ submit: 'Registration failed. Please try again.' });
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleNext = async () => {
+    if (!validate()) return;
+    if ((step === 2 && formData.role === UserRole.USER) || step === totalSteps) {
+      await handleSubmit();
+    } else {
+      setStep((s) => s + 1);
+    }
+  };
+
+  const progressPct = ((step - 1) / (totalSteps - 1)) * 100;
+
   return (
-    <div className="min-h-[calc(100vh-80px)] flex items-center justify-center px-4 py-12 bg-gradient-to-br from-primary-50 via-background to-secondary-50 dark:from-gray-900 dark:via-background dark:to-gray-800">
-      <div className="w-full max-w-2xl">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-display font-bold gradient-text mb-2">
-            Join Eventide
-          </h1>
-          <p className="text-default-500">Create your account and start exploring events</p>
+    <div className="min-h-screen flex">
+      {/* ── Left brand panel (desktop) ── */}
+      <div className="hidden lg:flex lg:w-1/2 gradient-primary flex-col justify-between p-10 relative overflow-hidden">
+        <div className="absolute -top-32 -right-32 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-white/10 rounded-full blur-3xl" />
+
+        <Link to="/" className="relative z-10 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center text-white">
+            <Logo size={22} />
+          </div>
+          <span className="font-display text-2xl font-bold text-white">Eventide</span>
+        </Link>
+
+        <div className="relative z-10 space-y-4">
+          <h2 className="font-display text-4xl font-bold text-white leading-tight">
+            Your next great<br />experience starts here.
+          </h2>
+          <p className="text-white/70 text-lg leading-relaxed">
+            Create an account to discover amazing events, or start hosting your own.
+          </p>
+          <div className="flex flex-col gap-3 mt-6">
+            {[
+              '✨ Curated events tailored to your interests',
+              '🎟 Seamless ticket booking in seconds',
+              '📊 Powerful analytics for organizers',
+            ].map((item) => (
+              <div key={item} className="flex items-center gap-2 text-white/80 text-sm">
+                {item}
+              </div>
+            ))}
+          </div>
         </div>
 
-        <Card className="w-full shadow-lg">
-          <CardHeader className="flex flex-col gap-3 px-6 pt-6">
-            <div className="flex justify-between items-center w-full">
-              <div>
-                <h2 className="text-2xl font-bold">Create Account</h2>
-                <p className="text-sm text-default-500">Step {step} of {totalSteps}</p>
-              </div>
-              <div className="text-sm text-default-500">
-                {step === 1 && 'Basic Info'}
-                {step === 2 && 'Account Type'}
-                {step === 3 && 'Organization'}
-              </div>
+        <div className="relative z-10 bg-white/15 backdrop-blur-sm rounded-2xl p-5">
+          <p className="text-white text-sm leading-relaxed italic">
+            "I sold out my first event within 48 hours thanks to Eventide's recommendation engine."
+          </p>
+          <div className="flex items-center gap-3 mt-3">
+            <div className="h-8 w-8 rounded-full bg-white/30 flex items-center justify-center text-white text-sm font-bold flex-none">
+              M
             </div>
-            <Progress value={(step / totalSteps) * 100} color="primary" size="sm" />
-          </CardHeader>
+            <div>
+              <p className="text-white text-sm font-semibold">Marcus Rivera</p>
+              <p className="text-white/60 text-xs">Independent Music Organizer</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
-          <CardBody className="px-6 py-4">
-            {errors.submit && (
-              <div className="mb-4 p-3 rounded-lg bg-danger-50 dark:bg-danger-900/20 text-danger text-sm">
-                {errors.submit}
-              </div>
-            )}
+      {/* ── Right form panel ── */}
+      <div className="flex-1 flex flex-col justify-center min-h-screen py-12 px-6 lg:px-12 bg-background">
+        {/* Mobile logo */}
+        <div className="lg:hidden mb-8 flex justify-center">
+          <Link to="/" className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg gradient-primary flex items-center justify-center text-white">
+              <Logo size={16} />
+            </div>
+            <span className="font-display font-semibold text-lg">Eventide</span>
+          </Link>
+        </div>
 
-            {step === 1 && (
-              <Step1BasicInfo
-                formData={formData}
-                errors={errors}
-                showPassword={showPassword}
-                onTogglePassword={() => setShowPassword(!showPassword)}
-                onChange={handleChange}
+        <div className="w-full max-w-md mx-auto">
+          {/* Header + progress */}
+          <div className="mb-6">
+            <h1 className="font-display text-3xl font-bold text-foreground">Create account</h1>
+            <p className="text-default-500 mt-1">
+              Step {step} of {totalSteps} — {STEP_LABELS[step - 1]}
+            </p>
+            <div className="mt-4">
+              <Progress
+                value={step === 1 ? 33 : progressPct}
+                color="primary"
+                size="sm"
+                className="mt-2"
               />
-            )}
+            </div>
+          </div>
 
-            {step === 2 && (
-              <Step2AccountType
-                selectedRole={formData.role}
-                agreeToTerms={formData.agreeToTerms}
-                errors={errors}
-                onRoleChange={(role) => handleChange('role', role)}
-                onTermsChange={(checked) => handleChange('agreeToTerms', checked)}
-              />
-            )}
+          {/* Error banner */}
+          {errors.submit && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-danger/10 text-danger text-sm mb-4">
+              {errors.submit}
+            </div>
+          )}
 
-            {step === 3 && (
-              <Step3Organization
-                formData={formData}
-                errors={errors}
-                createNewOrg={createNewOrg}
-                onToggleNewOrg={() => setCreateNewOrg(!createNewOrg)}
-                onChange={handleChange}
-                onOpenInfo={() => setShowModal(true)}
-              />
-            )}
-          </CardBody>
+          {/* Step content */}
+          {step === 1 && (
+            <Step1BasicInfo
+              formData={formData}
+              errors={errors}
+              showPassword={showPassword}
+              onTogglePassword={() => setShowPassword((v) => !v)}
+              onChange={handleChange}
+            />
+          )}
+          {step === 2 && (
+            <Step2AccountType
+              selectedRole={formData.role}
+              agreeToTerms={formData.agreeToTerms}
+              errors={errors}
+              onRoleChange={(role) => handleChange('role', role)}
+              onTermsChange={(checked) => handleChange('agreeToTerms', checked)}
+            />
+          )}
+          {step === 3 && (
+            <Step3Organization
+              formData={formData}
+              errors={errors}
+              createNewOrg={createNewOrg}
+              onToggleNewOrg={() => setCreateNewOrg((v) => !v)}
+              onChange={handleChange}
+              onOpenInfo={() => setShowModal(true)}
+            />
+          )}
 
-          <CardFooter className="flex justify-between px-6 pb-6">
-            <Button variant="light" onPress={() => setStep(step - 1)} isDisabled={step === 1}>
+          {/* Navigation */}
+          <div className="flex gap-3 mt-6">
+            <Button
+              variant="flat"
+              onPress={() => setStep((s) => s - 1)}
+              isDisabled={step === 1}
+              className="flex-1"
+            >
               Back
             </Button>
-            <Button color="primary" onPress={handleNext} isLoading={isLoading} size="lg">
-              {step === totalSteps ? 'Create Account' : 'Continue'}
+            <Button
+              color="primary"
+              onPress={handleNext}
+              isLoading={isLoading}
+              className="flex-1 font-semibold"
+            >
+              {step === totalSteps ? 'Create account' : 'Continue'}
             </Button>
-          </CardFooter>
-
-          <div className="px-6 pb-6 text-center">
-            <p className="text-sm text-default-500">
-              Already have an account?{' '}
-              <Link to="/login" className="text-primary font-semibold hover:underline">
-                Sign in
-              </Link>
-            </p>
           </div>
-        </Card>
+
+          <p className="mt-6 text-center text-sm text-default-500">
+            Already have an account?{' '}
+            <Link to="/login" className="text-primary font-semibold hover:underline">
+              Sign in
+            </Link>
+          </p>
+        </div>
       </div>
 
       <InfoModal isOpen={showModal} onClose={() => setShowModal(false)} />

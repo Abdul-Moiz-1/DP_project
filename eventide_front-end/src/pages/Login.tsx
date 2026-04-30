@@ -1,311 +1,198 @@
-
-
-
-
-
-
-
-// src/pages/Login.tsx
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import {
-  Card,
-  CardHeader,
-  CardBody,
-  CardFooter,
-  Input,
-  Button,
-  Divider,
-  Checkbox,
-} from '@heroui/react';
+import { Input, Button, Checkbox } from '@heroui/react';
+import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AxiosError } from 'axios';
+import { Logo } from '../components/Icons';
 
 const Login = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const navigate  = useNavigate();
+  const location  = useLocation();
   const { login, isAuthenticated } = useAuth();
 
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    rememberMe: false,
-  });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-
   const rawFrom = (location.state as any)?.from;
-  const from =
-    typeof rawFrom === "string"
-      ? rawFrom
-      : rawFrom?.pathname || "/";
+  const from    = typeof rawFrom === 'string' ? rawFrom : rawFrom?.pathname || '/';
+
+  const [formData, setFormData] = useState({ email: '', password: '', rememberMe: false });
+  const [errors,   setErrors]   = useState<Record<string, string>>({});
+  const [loading,  setLoading]  = useState(false);
+  const [showPwd,  setShowPwd]  = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate(from, { replace: true });
-    }
+    if (isAuthenticated) navigate(from, { replace: true });
   }, [isAuthenticated, navigate, from]);
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (!formData.email)                          e.email    = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) e.email  = 'Enter a valid email';
+    if (!formData.password)                        e.password = 'Password is required';
+    else if (formData.password.length < 6)         e.password = 'Min 6 characters';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
 
-    if (!formData.email) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid';
-    }
-
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const handleChange = (field: string, value: string | boolean) => {
+    setFormData((p) => ({ ...p, [field]: value }));
+    if (errors[field]) setErrors((p) => ({ ...p, [field]: '' }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-
-    if (!validateForm()) {
-      setErrors((prev) => ({ ...prev, submit: errors.email || errors.password ? 'Please fix the errors above' : '' }));
-      return
-    };
-
-    setIsLoading(true);
+    if (!validate()) return;
+    setLoading(true);
     try {
       await login(formData.email, formData.password);
       navigate(from, { replace: true });
-    } catch (error: AxiosError | any) {
-      console.log(error)
-      setErrors({ submit: `Error : ${error?.message}` });
+    } catch (err: AxiosError | any) {
+      setErrors({ submit: err?.response?.data?.message ?? err?.message ?? 'Invalid credentials' });
     } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleChange = (field: string, value: string | boolean) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: '' }));
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-[calc(100vh-80px)] flex items-center justify-center px-4 py-12 bg-gradient-to-br from-primary-50 via-background to-secondary-50 dark:from-gray-900 dark:via-background dark:to-gray-800">
-      <div className="w-full max-w-md">
-        {/* Logo/Brand */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-display font-bold gradient-text mb-2">
-            Welcome Back
-          </h1>
-          <p className="text-default-500">
-            Sign in to continue to Eventide
+    <div className="min-h-screen flex">
+      {/* ── Left brand panel (desktop) ── */}
+      <div className="hidden lg:flex lg:w-1/2 gradient-primary flex-col justify-between p-10 relative overflow-hidden">
+        {/* Decorative blobs */}
+        <div className="absolute -top-32 -right-32 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-white/10 rounded-full blur-3xl" />
+
+        {/* Logo */}
+        <Link to="/" className="relative z-10 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center text-white">
+            <Logo size={22} />
+          </div>
+          <span className="font-display text-2xl font-bold text-white">Eventide</span>
+        </Link>
+
+        {/* Tagline */}
+        <div className="relative z-10 space-y-4">
+          <h2 className="font-display text-4xl font-bold text-white leading-tight">
+            Discover, create,<br />and celebrate together.
+          </h2>
+          <p className="text-white/70 text-lg leading-relaxed">
+            Join thousands of event-goers and organizers on the world's most intuitive event platform.
           </p>
         </div>
 
-        {/* Login Card */}
-        <Card className="w-full shadow-lg">
-          <CardHeader className="flex flex-col gap-1 px-6 pt-6">
-            <h2 className="text-2xl font-bold">Login</h2>
-            <p className="text-sm text-default-500">
-              Enter your credentials to access your account
-            </p>
-          </CardHeader>
-
-          <CardBody className="px-6 py-4">
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              {/* Error Message */}
-              {errors.submit && (
-                <div className="p-3 rounded-lg bg-danger-50 dark:bg-danger-900/20 text-danger-600 dark:text-danger-400 text-sm">
-                  {errors.submit}
-                </div>
-              )}
-
-              {/* Email Input */}
-
-              
-              <Input
-                type="email"
-                label="Email"
-                placeholder="Enter your email"
-                value={formData.email}
-                onChange={(e) => handleChange('email', e.target.value)}
-                isInvalid={!!errors.email}
-                errorMessage={errors.email}
-                variant="bordered"
-                size="lg"
-                classNames={{
-                  input: 'text-base',
-                  label: 'text-sm font-medium',
-                }}
-              />
-
-              {/* Password Input */}
-              <Input
-                type={showPassword ? 'text' : 'password'}
-                label="Password"
-                placeholder="Enter your password"
-                value={formData.password}
-                onChange={(e) => handleChange('password', e.target.value)}
-                isInvalid={!!errors.password}
-                errorMessage={errors.password}
-                variant="bordered"
-                size="lg"
-                endContent={
-                  <button
-                    className="focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
-                    type="button"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <svg
-                        className="w-5 h-5 text-default-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                        />
-                      </svg>
-                    ) : (
-                      <svg
-                        className="w-5 h-5 text-default-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
-                        />
-                      </svg>
-                    )}
-                  </button>
-                }
-                classNames={{
-                  input: 'text-base',
-                  label: 'text-sm font-medium',
-                }}
-              />
-
-              {/* Remember Me & Forgot Password */}
-              <div className="flex justify-between items-center">
-                <Checkbox
-                  size="sm"
-                  isSelected={formData.rememberMe}
-                  onValueChange={(checked) =>
-                    handleChange('rememberMe', checked)
-                  }
-                >
-                  Remember me
-                </Checkbox>
-                <Link
-                  to="/forgot-password"
-                  className="text-sm text-primary hover:underline"
-                >
-                  Forgot password?
-                </Link>
-              </div>
-
-              {/* Submit Button */}
-              <Button
-                type="submit"
-                color="primary"
-                size="lg"
-                isLoading={isLoading}
-                className="font-semibold"
-              >
-                {isLoading ? 'Signing in...' : 'Sign In'}
-              </Button>
-            </form>
-
-            {/* Divider */}
-            <div className="flex items-center gap-4 my-6">
-              <Divider className="flex-1" />
-              <p className="text-sm text-default-400">OR</p>
-              <Divider className="flex-1" />
-            </div>
-
-            {/* Social Login Buttons */}
-            <div className="flex flex-col gap-3">
-              <Button
-                variant="bordered"
-                size="lg"
-                startContent={
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path
-                      fill="currentColor"
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    />
-                    <path
-                      fill="currentColor"
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    />
-                    <path
-                      fill="currentColor"
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                    />
-                    <path
-                      fill="currentColor"
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                    />
-                  </svg>
-                }
-              >
-                Continue with Google
-              </Button>
-
-              <Button
-                variant="bordered"
-                size="lg"
-                startContent={
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                  </svg>
-                }
-              >
-                Continue with Facebook
-              </Button>
-            </div>
-          </CardBody>
-
-          <CardFooter className="flex justify-center px-6 pb-6">
-            <p className="text-sm text-default-500">
-              Don't have an account?{' '}
-              <Link
-                to="/register"
-                className="text-primary font-semibold hover:underline"
-              >
-                Sign up
-              </Link>
-            </p>
-          </CardFooter>
-        </Card>
-
-        {/* Quick Test Login Info */}
-        <div className="mt-6 p-4 bg-default-100 dark:bg-default-50/5 rounded-lg">
-          <p className="text-xs text-default-500 text-center">
-            <strong>Test Accounts:</strong> Use any email ending with
-            "@organizer.com" for organizer role, or any other email for user
-            role.
+        {/* Testimonial */}
+        <div className="relative z-10 bg-white/15 backdrop-blur-sm rounded-2xl p-5">
+          <p className="text-white text-sm leading-relaxed italic">
+            "Eventide made organizing our annual tech conference effortless. The booking system is incredible!"
           </p>
+          <div className="flex items-center gap-3 mt-3">
+            <div className="h-8 w-8 rounded-full bg-white/30 flex items-center justify-center text-white text-sm font-bold flex-none">
+              S
+            </div>
+            <div>
+              <p className="text-white text-sm font-semibold">Sarah Chen</p>
+              <p className="text-white/60 text-xs">Event Organizer, TechTalks Inc.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Right form panel ── */}
+      <div className="flex-1 flex flex-col justify-center min-h-screen py-12 px-6 lg:px-12 bg-background">
+        {/* Mobile logo */}
+        <div className="lg:hidden mb-8 flex justify-center">
+          <Link to="/" className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg gradient-primary flex items-center justify-center text-white">
+              <Logo size={16} />
+            </div>
+            <span className="font-display font-semibold text-lg">Eventide</span>
+          </Link>
+        </div>
+
+        <div className="w-full max-w-md mx-auto">
+          <div className="mb-8">
+            <h1 className="font-display text-3xl font-bold text-foreground">Welcome back</h1>
+            <p className="text-default-500 mt-1">Sign in to your account to continue</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Error banner */}
+            {errors.submit && (
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-danger/10 text-danger text-sm">
+                <AlertCircle size={15} className="flex-none" />
+                {errors.submit}
+              </div>
+            )}
+
+            <Input
+              type="email"
+              label="Email address"
+              placeholder="you@example.com"
+              value={formData.email}
+              onChange={(e) => handleChange('email', e.target.value)}
+              isInvalid={!!errors.email}
+              errorMessage={errors.email}
+              variant="bordered"
+              size="lg"
+            />
+
+            <Input
+              type={showPwd ? 'text' : 'password'}
+              label="Password"
+              placeholder="••••••••"
+              value={formData.password}
+              onChange={(e) => handleChange('password', e.target.value)}
+              isInvalid={!!errors.password}
+              errorMessage={errors.password}
+              variant="bordered"
+              size="lg"
+              endContent={
+                <button
+                  type="button"
+                  aria-label={showPwd ? 'Hide password' : 'Show password'}
+                  onClick={() => setShowPwd((v) => !v)}
+                  className="text-default-400 hover:text-default-600 transition-colors"
+                >
+                  {showPwd ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              }
+            />
+
+            <div className="flex items-center justify-between">
+              <Checkbox
+                size="sm"
+                isSelected={formData.rememberMe}
+                onValueChange={(v) => handleChange('rememberMe', v)}
+              >
+                <span className="text-sm text-default-600">Remember me</span>
+              </Checkbox>
+              <Link to="/forgot-password" className="text-sm text-primary hover:underline">
+                Forgot password?
+              </Link>
+            </div>
+
+            <Button
+              type="submit"
+              color="primary"
+              size="lg"
+              isLoading={loading}
+              className="w-full h-11 font-semibold"
+            >
+              Sign in
+            </Button>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-default-500">
+            Don't have an account?{' '}
+            <Link to="/register" className="text-primary font-semibold hover:underline">
+              Sign up for free
+            </Link>
+          </p>
+
+          {/* Dev hint */}
+          <div className="mt-8 p-3 bg-default-100 rounded-xl">
+            <p className="text-xs text-default-400 text-center">
+              <strong>Dev accounts:</strong> organizer@eventide.dev · user@eventide.dev · Password123!
+            </p>
+          </div>
         </div>
       </div>
     </div>

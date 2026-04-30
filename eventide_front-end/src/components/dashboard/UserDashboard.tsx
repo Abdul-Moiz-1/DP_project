@@ -1,21 +1,8 @@
-import { Link } from "react-router-dom";
-import {
-  Card,
-  CardHeader,
-  CardBody,
-  Button,
-  Chip,
-  Avatar,
-} from "@heroui/react";
-import { Booking, User } from "@/api/types";
-import {
-  Calendar,
-  DollarSign,
-  ShoppingBag,
-  Ticket,
-  TimerIcon,
-} from "lucide-react";
-import { MetricCard } from "./metric-card";
+import { Link } from 'react-router-dom';
+import { Button, Chip } from '@heroui/react';
+import { Ticket, Calendar, Clock, DollarSign, ArrowRight, Compass } from 'lucide-react';
+import { MetricCard } from './metric-card';
+import type { Booking, User } from '@/api/types';
 
 interface UserStats {
   totalBookings: number;
@@ -30,191 +17,114 @@ interface UserDashboardProps {
   bookings: Booking[];
 }
 
-const UserDashboard = ({ user, stats, bookings }: UserDashboardProps) => {
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  };
+const HOUR = new Date().getHours();
+const GREETING = HOUR < 12 ? 'Good morning' : HOUR < 18 ? 'Good afternoon' : 'Good evening';
 
+const UserDashboard = ({ user, stats, bookings }: UserDashboardProps) => {
   const upcomingBookings = bookings.filter(
-    (b) => b.status === "CONFIRMED" && new Date(b.event.startDate) > new Date()
+    (b) => b.status === 'CONFIRMED' && new Date(b.event.startDate) > new Date(),
   );
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-8">
+      {/* Greeting */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground">
-          Welcome back, {user?.name || "Guest"}!
+        <h1 className="font-display text-2xl font-bold text-foreground">
+          {GREETING}, {user?.name ?? 'there'} 👋
         </h1>
-        <p className="text-default-400 mt-1">
-          Manage your tickets and explore new events
+        <p className="text-default-500 mt-1 text-sm">
+          Ready to discover your next adventure?
         </p>
       </div>
 
-      {/* Stats Cards */}
+      {/* Metric cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          title="Tickets Purchased"
-          value={stats.totalBookings.toString()}
-          icon={<Ticket className="w-5 h-5 text-primary" />}
+          title="Upcoming Tickets"
+          value={stats.upcomingEvents}
+          icon={Ticket}
+          color="primary"
         />
         <MetricCard
-          title="Upcoming Events"
-          value={stats.upcomingEvents.toString()}
-          icon={<Calendar className="w-5 h-5 text-primary" />}
+          title="Total Bookings"
+          value={stats.totalBookings}
+          icon={Calendar}
+          color="secondary"
         />
         <MetricCard
           title="Past Events"
-          value={stats.pastEvents.toString()}
-          icon={<TimerIcon className="w-5 h-5 text-primary" />}
+          value={stats.pastEvents}
+          icon={Clock}
+          color="success"
         />
         <MetricCard
           title="Total Spent"
           value={`$${stats.totalSpent.toLocaleString()}`}
-          icon={<DollarSign className="w-5 h-5 text-primary" />}
+          icon={DollarSign}
+          color="warning"
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Upcoming Events */}
-        <div className="lg:col-span-2">
-          <Card className="border border-default-200 shadow-sm">
-            <CardHeader className="flex justify-between px-6 pt-5 pb-0">
-              <h2 className="text-xl font-bold text-foreground">
-                Upcoming Events
-              </h2>
-              <Button
-                as={Link}
-                to="/dashboard/my-tickets"
-                size="sm"
-                variant="flat"
-                color="primary"
-              >
-                View All Tickets
-              </Button>
-            </CardHeader>
-            <CardBody className="px-6 pb-5 space-y-4">
-              {upcomingBookings.length === 0 ? (
-                <div className="text-center py-12">
-                  <Calendar className="w-12 h-12 text-default-300 mx-auto mb-4" />
-                  <p className="text-default-500 mb-4">
-                    No upcoming events yet
+      {/* Upcoming events */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-display text-lg font-semibold">Your Upcoming Events</h2>
+          <Button
+            as={Link}
+            to="/dashboard/my-tickets"
+            variant="flat"
+            size="sm"
+            endContent={<ArrowRight size={14} />}
+          >
+            All tickets
+          </Button>
+        </div>
+
+        {upcomingBookings.length === 0 ? (
+          <div className="card-base p-10 text-center">
+            <div className="rounded-full bg-primary/10 p-4 mx-auto w-fit mb-4">
+              <Compass size={28} className="text-primary" />
+            </div>
+            <p className="font-semibold text-sm mb-1">No upcoming events</p>
+            <p className="text-xs text-default-400 mb-4">
+              Discover events happening near you
+            </p>
+            <Button as={Link} to="/events" color="primary" size="sm">
+              Browse Events
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {upcomingBookings.slice(0, 5).map((booking) => (
+              <div key={booking.id} className="card-base p-4 flex gap-4">
+                {/* Color bar */}
+                <div className="w-1 rounded-full gradient-primary flex-none" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate">{booking.event.name}</p>
+                  <p className="text-xs text-default-400 mt-0.5">
+                    {new Date(booking.event.startDate).toLocaleDateString(undefined, {
+                      weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+                    })}
                   </p>
-                  <Button as={Link} to="/events" color="primary">
-                    Browse Events
+                  <p className="text-xs text-default-400">{booking.event.city}</p>
+                </div>
+                <div className="flex flex-col items-end gap-2 flex-none">
+                  <Chip size="sm" color="success" variant="flat">
+                    Confirmed
+                  </Chip>
+                  <Button
+                    as={Link}
+                    to={`/events/${booking.event.id}`}
+                    size="sm"
+                    variant="flat"
+                  >
+                    View
                   </Button>
                 </div>
-              ) : (
-                upcomingBookings.slice(0, 4).map((booking) => (
-                  <div
-                    key={booking.id}
-                    className="flex gap-4 p-4 border border-default-200 rounded-xl hover:border-primary transition-colors"
-                  >
-                    {booking.event.images?.[0]?.imageUrl ? (
-                      <img
-                        src={booking.event.images[0].imageUrl}
-                        alt={booking.event.name}
-                        className="w-24 h-24 rounded-lg object-cover flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-24 h-24 rounded-lg bg-default-100 flex items-center justify-center flex-shrink-0">
-                        <Calendar className="w-8 h-8 text-default-300" />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-lg mb-1 truncate">
-                        {booking.event.name}
-                      </h3>
-                      <p className="text-sm text-default-500 mb-1">
-                        {formatDate(booking.event.startDate)}
-                      </p>
-                      <p className="text-sm text-default-500 mb-2">
-                        {booking.event.city}
-                      </p>
-                      <Chip size="sm" variant="flat" color="primary">
-                        {booking.ticket.name}
-                      </Chip>
-                    </div>
-                    <div className="flex flex-col gap-2 flex-shrink-0">
-                      <Button
-                        as={Link}
-                        to={`/events/${booking.event.id}`}
-                        size="sm"
-                        variant="bordered"
-                      >
-                        View
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </CardBody>
-          </Card>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Profile Card */}
-          <Card className="border border-default-200 shadow-sm">
-            <CardHeader className="px-6 pt-5 pb-0">
-              <h2 className="text-lg font-bold text-foreground">Profile</h2>
-            </CardHeader>
-            <CardBody className="flex flex-col items-center gap-3 px-6 pb-5">
-              <Avatar name={user?.name} size="lg" className="mb-2" />
-              <div className="font-bold text-lg">
-                {user?.name || "Guest"}
               </div>
-              <Chip color="primary" variant="flat" size="sm">
-                {user?.email || "No email"}
-              </Chip>
-            </CardBody>
-          </Card>
-
-          {/* Quick Actions */}
-          <Card className="border border-default-200 shadow-sm">
-            <CardHeader className="px-6 pt-5 pb-0">
-              <h2 className="text-lg font-bold text-foreground">
-                Quick Actions
-              </h2>
-            </CardHeader>
-            <CardBody className="flex flex-col gap-3 px-6 pb-5">
-              <Button
-                as={Link}
-                to="/events"
-                color="primary"
-                variant="flat"
-                startContent={<Calendar className="w-4 h-4" />}
-                className="justify-start"
-              >
-                Browse Events
-              </Button>
-              <Button
-                as={Link}
-                to="/dashboard/orders"
-                variant="flat"
-                startContent={<ShoppingBag className="w-4 h-4" />}
-                className="justify-start"
-              >
-                My Orders
-              </Button>
-              <Button
-                as={Link}
-                to="/dashboard/my-tickets"
-                variant="flat"
-                startContent={<Ticket className="w-4 h-4" />}
-                className="justify-start"
-              >
-                My Tickets
-              </Button>
-            </CardBody>
-          </Card>
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -22,6 +22,7 @@ import SavedEventsPage from "./pages/dashboard/SavedEventsPage";
 import SettingsPage from "./pages/dashboard/SettingsPage";
 import ReviewsPage from "./pages/dashboard/ReviewsPage";
 import EventAnalyticsPage from "./pages/dashboard/EventAnalyticsPage";
+import AnalyticsOverviewPage from "./pages/dashboard/AnalyticsOverviewPage";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 function App() {
@@ -45,6 +46,7 @@ function App() {
           <Route index element={<DashboardHome />} />
           <Route path="events" element={<DashboardEvents />} />
           <Route path="events/create" element={<CreateEventPage />} />
+          <Route path="analytics" element={<AnalyticsOverviewPage />} />
           <Route path="event/:id" element={<UpdateEventPage />} />
           <Route path="event/:id/analytics" element={<EventAnalyticsPage />} />
           <Route path="bookings" element={<BookingsPage />} />

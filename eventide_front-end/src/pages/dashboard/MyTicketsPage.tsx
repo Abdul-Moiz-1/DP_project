@@ -1,177 +1,160 @@
-"use client"
-import { useEffect, useState } from "react"
-import { useLocation } from "react-router-dom"
-import { Button } from "@heroui/react"
-import { Card, CardBody, CardFooter } from "@heroui/react"
-import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell } from "@heroui/react"
-import { Pagination } from "@heroui/react"
-import { Badge } from "@heroui/badge"
-import { useToast } from "@/components/toast-provider"
-import { Booking } from "@/api/types"
-import { eventService } from "@/services/eventService"
-import { format } from "date-fns"
-import { Download, Calendar, MapPin, Ticket } from "lucide-react"
+import { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { Button, Chip } from '@heroui/react';
+import { Calendar, MapPin, Ticket } from 'lucide-react';
+import { Booking } from '@/api/types';
+import { eventService } from '@/services/eventService';
+import { useToast } from '@/components/toast-provider';
+
+const FALLBACK_IMG = 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=200';
+
+function TicketItem({ booking }: { booking: Booking }) {
+  const eventDate = new Date(booking.event.startDate);
+  const isPast = eventDate < new Date();
+  const isCancelled = booking.status === 'CANCELLED';
+
+  return (
+    <div className="card-base p-4 flex gap-4">
+      <div className="h-16 w-16 rounded-xl overflow-hidden flex-none">
+        <img
+          src={booking.event.images?.[0]?.imageUrl || FALLBACK_IMG}
+          alt={booking.event.name}
+          className="h-full w-full object-cover"
+          onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_IMG; }}
+        />
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-sm truncate">{booking.event.name}</p>
+        <div className="flex items-center gap-1 text-xs text-default-400 mt-1">
+          <Calendar size={11} />
+          {eventDate.toLocaleDateString(undefined, {
+            weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+          })}
+        </div>
+        <p className="text-xs text-default-400 mt-0.5">
+          {booking.ticket.name} · ${booking.ticket.price}
+        </p>
+      </div>
+
+      <div className="flex flex-col items-end gap-2 flex-none">
+        <Chip
+          size="sm"
+          variant="flat"
+          color={isCancelled ? 'danger' : isPast ? 'default' : 'success'}
+        >
+          {isCancelled ? 'Cancelled' : isPast ? 'Past' : 'Upcoming'}
+        </Chip>
+        <Button
+          as={Link}
+          to={`/events/${booking.event.id}`}
+          size="sm"
+          variant="flat"
+        >
+          View
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export default function MyTicketsPage() {
-  const [bookings, setBookings] = useState<Booking[]>([])
-  const [loading, setLoading] = useState(true)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const { success, error } = useToast()
-  const location = useLocation()
-  const itemsPerPage = 5
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const { success, error } = useToast();
+  const location = useLocation();
 
   useEffect(() => {
-    fetchBookings()
-    
-    // Check if we have a successful booking from navigation state
     if (location.state?.bookingSuccess) {
-      success("Booking completed successfully!")
-      // Clear the state to prevent showing the message on page refresh
-      window.history.replaceState({}, document.title)
+      success('Booking completed successfully!');
+      window.history.replaceState({}, document.title);
     }
-  }, [currentPage])
+    fetchBookings();
+  }, []);
 
   const fetchBookings = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const response = await eventService.fetchMyBookings()
-      setBookings(response?.items || [])
-      console.log("Bookings in MyTicketsPage:", response?.items)
-      setTotalPages(Math.ceil(response.pages / itemsPerPage))
-    } catch (err) {
-      console.error("Failed to fetch bookings:", err)
-      error("Failed to load your tickets")
+      const res = await eventService.fetchMyBookings();
+      setBookings(res?.items || []);
+    } catch {
+      error('Failed to load your tickets');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page)
-  }
+  const now = new Date();
+  const upcoming  = bookings.filter((b) => b.status === 'CONFIRMED' && new Date(b.event.startDate) >= now);
+  const past      = bookings.filter((b) => b.status === 'CONFIRMED' && new Date(b.event.startDate) < now);
+  const cancelled = bookings.filter((b) => b.status === 'CANCELLED');
 
-  // Get current bookings for pagination
-  const indexOfLastBooking = currentPage * itemsPerPage
-  const indexOfFirstBooking = indexOfLastBooking - itemsPerPage
-  const currentBookings = bookings.slice(indexOfFirstBooking, indexOfLastBooking)
-
-  // Function to generate a ticket PDF (mock function)
-  const downloadTicket = (bookingId: number) => {
-    success("Ticket download started")
-    // In a real app, this would generate and download a PDF ticket
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent" />
+      </div>
+    );
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">My Tickets</h1>
-          <p className="text-default-600">View and manage your event tickets</p>
-        </div>
+    <div className="space-y-8 max-w-2xl">
+      <div>
+        <h1 className="font-display text-2xl font-bold text-foreground">My Tickets</h1>
+        <p className="text-default-400 text-sm mt-0.5">
+          {bookings.length} ticket{bookings.length !== 1 ? 's' : ''} total
+        </p>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      {bookings.length === 0 ? (
+        <div className="card-base p-12 text-center">
+          <div className="rounded-full bg-primary/10 p-4 mx-auto w-fit mb-4">
+            <Ticket size={28} className="text-primary" />
+          </div>
+          <p className="font-semibold text-sm mb-1">No tickets yet</p>
+          <p className="text-xs text-default-400 mb-4">
+            Book an event to see your tickets here
+          </p>
+          <Button as={Link} to="/events" color="primary" size="sm">
+            Browse Events
+          </Button>
         </div>
-      ) : bookings.length === 0 ? (
-        <Card className="w-full">
-          <CardBody className="text-center py-10">
-            <div className="mx-auto mb-4 bg-default-100 p-4 rounded-full w-16 h-16 flex items-center justify-center">
-              <Ticket size={24} className="text-default-500" />
-            </div>
-            <h3 className="text-xl font-semibold mb-2">No tickets found</h3>
-            <p className="text-default-600 mb-4">You haven't booked any events yet.</p>
-            <Button 
-              color="primary" 
-              href="/events"
-            >
-              Browse Events
-            </Button>
-          </CardBody>
-        </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-6">
-          {currentBookings.map((booking) => {
-            const eventDate = new Date(booking.event.startDate)
-            const isPastEvent = eventDate < new Date()
-            
-            return (
-              <Card key={booking.id} className="w-full">
-                <CardBody className="p-0">
-                  <div className="flex flex-col md:flex-row">
-                    <div className="md:w-1/4 h-48 md:h-auto">
-                      <img 
-                        src={booking.event.images[0]?.imageUrl || "https://via.placeholder.com/300x200?text=No+Image"} 
-                        alt={booking.event.name} 
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="p-6 md:w-3/4 flex flex-col justify-between">
-                      <div>
-                        <div className="flex justify-between items-start mb-2">
-                          <h3 className="text-xl font-bold">{booking.event.name}</h3>
-                          <Badge color={isPastEvent ? "default" : "success"}>
-                            {isPastEvent ? "Past" : "Upcoming"}
-                          </Badge>
-                        </div>
-                        
-                        <div className="flex flex-col gap-2 mb-4">
-                          <div className="flex items-center text-default-600">
-                            <Calendar size={16} className="mr-2" />
-                            <span>{format(eventDate, "EEEE, MMMM d, yyyy 'at' h:mm a")}</span>
-                          </div>
-                          <div className="flex items-center text-default-600">
-                            <MapPin size={16} className="mr-2" />
-                            <span>{booking.event.city}</span>
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-                          <div>
-                            <p className="text-sm text-default-500">Ticket Type</p>
-                            <p className="font-medium">{booking.ticket.name}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-default-500">Quantity</p>
-                            <p className="font-medium">1</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-default-500">Price</p>
-                            <p className="font-medium">${booking.ticket.price}</p>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex justify-end">
-                        <Button 
-                          color="primary" 
-                          variant="flat"
-                          startContent={<Download size={16} />}
-                          onClick={() => downloadTicket(booking.id)}
-                        >
-                          Download Ticket
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardBody>
-              </Card>
-            )
-          })}
-          
-          {bookings.length > itemsPerPage && (
-            <div className="flex justify-center mt-4">
-              <Pagination
-                total={totalPages}
-                initialPage={currentPage}
-                onChange={handlePageChange}
-              />
-            </div>
+        <>
+          {upcoming.length > 0 && (
+            <section>
+              <h2 className="font-display text-base font-semibold mb-3">
+                Upcoming <span className="text-default-400 font-normal text-sm">({upcoming.length})</span>
+              </h2>
+              <div className="space-y-2">
+                {upcoming.map((b) => <TicketItem key={b.id} booking={b} />)}
+              </div>
+            </section>
           )}
-        </div>
+
+          {past.length > 0 && (
+            <section>
+              <h2 className="font-display text-base font-semibold mb-3">
+                Past <span className="text-default-400 font-normal text-sm">({past.length})</span>
+              </h2>
+              <div className="space-y-2">
+                {past.map((b) => <TicketItem key={b.id} booking={b} />)}
+              </div>
+            </section>
+          )}
+
+          {cancelled.length > 0 && (
+            <section>
+              <h2 className="font-display text-base font-semibold mb-3 text-default-500">
+                Cancelled <span className="font-normal text-sm">({cancelled.length})</span>
+              </h2>
+              <div className="space-y-2">
+                {cancelled.map((b) => <TicketItem key={b.id} booking={b} />)}
+              </div>
+            </section>
+          )}
+        </>
       )}
     </div>
-  )
+  );
 }

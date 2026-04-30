@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(Test-Path \"d:\\\\Projects\\\\DP_project\\\\eventide_front-end\\\\src\\\\components\\\\dashboard\\\\EventRow.tsx\")"
     ]
   }
 }

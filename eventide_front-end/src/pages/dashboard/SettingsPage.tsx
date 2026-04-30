@@ -27,6 +27,22 @@ import { eventService } from "@/services/eventService";
 import { useToast } from "@/components/toast-provider";
 import { api } from "@/api/api";
 
+const inputClassNames = {
+  label: "pb-1 text-sm font-medium text-default-700 dark:text-default-300",
+  inputWrapper:
+    "min-h-12 border border-divider bg-content1 shadow-none transition-colors group-data-[focus=true]:border-primary group-data-[hover=true]:border-default-400",
+  input: "text-foreground placeholder:text-default-400",
+  description: "text-default-500",
+  errorMessage: "text-danger",
+};
+
+const readOnlyInputClassNames = {
+  ...inputClassNames,
+  inputWrapper:
+    "min-h-12 border border-divider bg-default-100/80 shadow-none opacity-100",
+  input: "text-default-700 dark:text-default-300",
+};
+
 export default function SettingsPage() {
   const { user, updateUser } = useAuth();
   const { success, warning } = useToast();
@@ -145,14 +161,14 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="max-w-5xl space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Settings</h1>
-        <p className="text-default-400 mt-1">Manage your account and preferences</p>
+        <h1 className="font-display text-2xl font-bold text-foreground">Settings</h1>
+        <p className="text-default-400 mt-0.5 text-sm">Manage your account and preferences</p>
       </div>
 
       {/* Profile Info */}
-      <Card className="border border-default-200 shadow-sm">
+      <Card className="border border-divider shadow-card">
         <CardHeader className="px-6 pt-5 pb-0">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-primary/10">
@@ -169,12 +185,33 @@ export default function SettingsPage() {
             <Avatar name={user?.name} size="lg" />
             <div>
               <p className="font-semibold text-foreground">{user?.name}</p>
-              <Chip size="sm" variant="flat" color="primary">{user?.role}</Chip>
+              <Chip size="sm" variant="flat" color="primary" className="font-semibold tracking-wide">
+                {user?.role}
+              </Chip>
             </div>
           </div>
           <Divider />
-          <Input label="Full Name" value={name} onValueChange={setName} startContent={<UserIcon className="w-4 h-4 text-default-400" />} />
-          <Input label="Email" value={user?.email || ""} isReadOnly startContent={<Mail className="w-4 h-4 text-default-400" />} description="Email cannot be changed" />
+          <div className="grid gap-4 md:grid-cols-2">
+            <Input
+              label="Full Name"
+              labelPlacement="outside"
+              variant="bordered"
+              value={name}
+              onValueChange={setName}
+              startContent={<UserIcon className="w-4 h-4 text-default-400" />}
+              classNames={inputClassNames}
+            />
+            <Input
+              label="Email"
+              labelPlacement="outside"
+              variant="bordered"
+              value={user?.email || ""}
+              isReadOnly
+              startContent={<Mail className="w-4 h-4 text-default-400" />}
+              description="Email cannot be changed"
+              classNames={readOnlyInputClassNames}
+            />
+          </div>
           <div className="flex justify-end">
             <Button color="primary" isLoading={saving} startContent={!saving && <Save className="w-4 h-4" />} onPress={handleUpdateProfile}>
               Save Changes
@@ -209,7 +246,7 @@ export default function SettingsPage() {
                       key={cat.id}
                       variant={isSelected ? "solid" : "bordered"}
                       color={isSelected ? "primary" : "default"}
-                      className="cursor-pointer transition-all"
+                      className="cursor-pointer border-default-300 px-1 transition-all data-[hover=true]:border-primary/50"
                       onClick={() => toggleCategory(cat.id)}
                     >
                       {cat.name}
@@ -226,7 +263,6 @@ export default function SettingsPage() {
                 </p>
                 <Button
                   color="primary"
-                  variant="flat"
                   isLoading={savingPrefs}
                   startContent={!savingPrefs && <Save className="w-4 h-4" />}
                   onPress={handleSavePreferences}
@@ -254,18 +290,41 @@ export default function SettingsPage() {
           </div>
         </CardHeader>
         <CardBody className="px-6 pb-5 space-y-4">
-          <Input label="Current Password" type="password" value={currentPassword} onValueChange={setCurrentPassword} startContent={<Shield className="w-4 h-4 text-default-400" />} />
-          <Input label="New Password" type="password" value={newPassword} onValueChange={setNewPassword} description="Minimum 6 characters" />
+          <div className="grid gap-4 md:grid-cols-2">
+            <Input
+              label="Current Password"
+              labelPlacement="outside"
+              variant="bordered"
+              type="password"
+              value={currentPassword}
+              onValueChange={setCurrentPassword}
+              startContent={<Shield className="w-4 h-4 text-default-400" />}
+              classNames={inputClassNames}
+            />
+            <Input
+              label="New Password"
+              labelPlacement="outside"
+              variant="bordered"
+              type="password"
+              value={newPassword}
+              onValueChange={setNewPassword}
+              description="Minimum 6 characters"
+              classNames={inputClassNames}
+            />
+          </div>
           <Input
             label="Confirm New Password"
+            labelPlacement="outside"
+            variant="bordered"
             type="password"
             value={confirmPassword}
             onValueChange={setConfirmPassword}
             isInvalid={confirmPassword !== "" && confirmPassword !== newPassword}
             errorMessage={confirmPassword !== "" && confirmPassword !== newPassword ? "Passwords do not match" : undefined}
+            classNames={inputClassNames}
           />
           <div className="flex justify-end">
-            <Button color="warning" variant="flat" isLoading={changingPassword} startContent={!changingPassword && <KeyRound className="w-4 h-4" />} onPress={handleChangePassword}>
+            <Button color="warning" isLoading={changingPassword} startContent={!changingPassword && <KeyRound className="w-4 h-4" />} onPress={handleChangePassword}>
               Change Password
             </Button>
           </div>
@@ -287,18 +346,62 @@ export default function SettingsPage() {
             </div>
           </CardHeader>
           <CardBody className="px-6 pb-5 space-y-4">
-            <Input label="Organization Name" value={orgName} onValueChange={setOrgName} startContent={<Building2 className="w-4 h-4 text-default-400" />} />
-            <Input label="Address" value={orgAddress} onValueChange={setOrgAddress} startContent={<MapPin className="w-4 h-4 text-default-400" />} />
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="City" value={orgCity} onValueChange={setOrgCity} />
-              <Input label="State" value={orgState} onValueChange={setOrgState} />
+            <Input
+              label="Organization Name"
+              labelPlacement="outside"
+              variant="bordered"
+              value={orgName}
+              onValueChange={setOrgName}
+              startContent={<Building2 className="w-4 h-4 text-default-400" />}
+              classNames={inputClassNames}
+            />
+            <Input
+              label="Address"
+              labelPlacement="outside"
+              variant="bordered"
+              value={orgAddress}
+              onValueChange={setOrgAddress}
+              startContent={<MapPin className="w-4 h-4 text-default-400" />}
+              classNames={inputClassNames}
+            />
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input
+                label="City"
+                labelPlacement="outside"
+                variant="bordered"
+                value={orgCity}
+                onValueChange={setOrgCity}
+                classNames={inputClassNames}
+              />
+              <Input
+                label="State"
+                labelPlacement="outside"
+                variant="bordered"
+                value={orgState}
+                onValueChange={setOrgState}
+                classNames={inputClassNames}
+              />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="Country" value={orgCountry} onValueChange={setOrgCountry} />
-              <Input label="ZIP Code" value={orgZip} onValueChange={setOrgZip} />
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input
+                label="Country"
+                labelPlacement="outside"
+                variant="bordered"
+                value={orgCountry}
+                onValueChange={setOrgCountry}
+                classNames={inputClassNames}
+              />
+              <Input
+                label="ZIP Code"
+                labelPlacement="outside"
+                variant="bordered"
+                value={orgZip}
+                onValueChange={setOrgZip}
+                classNames={inputClassNames}
+              />
             </div>
             <div className="flex justify-end">
-              <Button color="success" variant="flat" isLoading={savingOrg} startContent={!savingOrg && <Save className="w-4 h-4" />} onPress={handleUpdateOrgProfile}>
+              <Button color="success" isLoading={savingOrg} startContent={!savingOrg && <Save className="w-4 h-4" />} onPress={handleUpdateOrgProfile}>
                 Save Organization
               </Button>
             </div>

@@ -1,68 +1,45 @@
-"use client";
+import { useEffect, useState } from 'react';
+import {
+  Button, Chip, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input,
+} from '@heroui/react';
+import { Plus, Search, Calendar } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Event } from '@/api/types';
+import { api } from '@/api/api';
+import { eventService } from '@/services/eventService';
+import { useToast } from '@/components/toast-provider';
+import EventRow from '@/components/dashboard/EventRow';
+import { cn } from '@/lib/utils';
 
-import { useEffect, useState } from "react";
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Input,
-  Dropdown,
-  DropdownTrigger,
-  DropdownMenu,
-  DropdownItem,
-} from "@heroui/react";
-import { useNavigate } from "react-router-dom";
-import { Link } from "react-router-dom";
-import {
-  BarChart2,
-  Calendar,
-  Edit2,
-  Eye,
-  Plus,
-  Search,
-  Trash2,
-  Users,
-} from "lucide-react";
-import { Event } from "@/api/types";
-import { api } from "@/api/api";
-import { eventService } from "@/services/eventService";
-import { useToast } from "@/components/toast-provider";
+const STATUS_FILTERS = ['All', 'PUBLISHED', 'DRAFT', 'CANCELLED', 'COMPLETED'] as const;
+type Filter = typeof STATUS_FILTERS[number];
+
+const FILTER_COLORS: Record<Filter, 'default' | 'success' | 'warning' | 'danger' | 'primary'> = {
+  All:       'primary',
+  PUBLISHED: 'success',
+  DRAFT:     'warning',
+  CANCELLED: 'danger',
+  COMPLETED: 'default',
+};
 
 export default function DashboardEvents() {
   const navigate = useNavigate();
   const { success, warning } = useToast();
 
-  const [events, setEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [deleteModal, setDeleteModal] = useState(false);
+  const [events,       setEvents]       = useState<Event[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [searchQuery,  setSearchQuery]  = useState('');
+  const [statusFilter, setStatusFilter] = useState<Filter>('All');
+  const [deletingId,   setDeletingId]   = useState<number | null>(null);
+  const [deleteModal,  setDeleteModal]  = useState(false);
 
-  useEffect(() => {
-    loadEvents();
-  }, []);
+  useEffect(() => { loadEvents(); }, []);
 
   const loadEvents = async () => {
     setLoading(true);
     try {
-      const data = await eventService.fetchMyEvents();
-      setEvents(data);
-    } catch (error) {
-      console.error("Failed to load events:", error);
-    } finally {
+      setEvents(await eventService.fetchMyEvents());
+    } catch { /* silent */ } finally {
       setLoading(false);
     }
   };
@@ -70,302 +47,138 @@ export default function DashboardEvents() {
   const confirmDelete = async () => {
     if (!deletingId) return;
     try {
-      const response = await api.delete(`/events/${deletingId}`);
-      if (response.status === 200) {
-        setEvents((prev) => prev.filter((e) => e.id !== deletingId));
-        success("Event deleted successfully");
-      }
+      await api.delete(`/events/${deletingId}`);
+      setEvents((prev) => prev.filter((e) => e.id !== deletingId));
+      success('Event deleted');
     } catch (error: any) {
-      warning(error.response?.data?.message || "Failed to delete event");
+      warning(error.response?.data?.message || 'Failed to delete event');
     } finally {
       setDeleteModal(false);
       setDeletingId(null);
     }
   };
 
-  const handleStatusChange = async (eventId: number, newStatus: string) => {
-    try {
-      await eventService.updateEventStatus(eventId, newStatus);
-      setEvents((prev) =>
-        prev.map((e) => (e.id === eventId ? { ...e, status: newStatus } : e))
-      );
-      success("Event status updated");
-    } catch (error: any) {
-      warning(error.response?.data?.message || "Failed to update status");
-    }
-  };
-
-  const getEventStatusStyle = (status: string) => {
-    switch (status) {
-      case "PUBLISHED": return "success";
-      case "DRAFT": return "warning";
-      case "CANCELLED": return "danger";
-      case "COMPLETED": return "default";
-      default: return "default";
-    }
-  };
-
-  const filteredEvents = events.filter((event) =>
-    event.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = events.filter((e) => {
+    const matchSearch = e.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchStatus = statusFilter === 'All' || e.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Delete Confirmation */}
+      {/* Delete modal */}
       <Modal isOpen={deleteModal} onClose={() => setDeleteModal(false)}>
         <ModalContent>
           <ModalHeader>Delete Event</ModalHeader>
           <ModalBody>
-            <p className="text-default-500">
-              Are you sure you want to delete this event? This action cannot be
-              undone.
+            <p className="text-sm text-default-500">
+              This action cannot be undone. All associated bookings will also be removed.
             </p>
           </ModalBody>
           <ModalFooter>
-            <Button
-              variant="light"
-              onPress={() => {
-                setDeleteModal(false);
-                setDeletingId(null);
-              }}
-            >
+            <Button variant="flat" onPress={() => { setDeleteModal(false); setDeletingId(null); }}>
               Cancel
             </Button>
-            <Button color="danger" onPress={confirmDelete}>
-              Delete Event
-            </Button>
+            <Button color="danger" onPress={confirmDelete}>Delete Event</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Your Events</h1>
-          <p className="text-default-400 mt-1">
-            Manage all your created events
+          <h1 className="font-display text-2xl font-bold text-foreground">My Events</h1>
+          <p className="text-default-400 text-sm mt-0.5">
+            {events.length} event{events.length !== 1 ? 's' : ''} total
           </p>
         </div>
         <Button
           color="primary"
-          startContent={<Plus className="w-4 h-4" />}
-          onPress={() => navigate("/dashboard/events/create")}
+          size="sm"
+          startContent={<Plus size={15} />}
+          onPress={() => navigate('/dashboard/events/create')}
         >
           Create Event
         </Button>
       </div>
 
-      {/* Search */}
+      {/* Search + status filters */}
       {events.length > 0 && (
-        <Input
-          placeholder="Search events..."
-          value={searchQuery}
-          onValueChange={setSearchQuery}
-          startContent={<Search className="w-4 h-4 text-default-400" />}
-          classNames={{ inputWrapper: "bg-background border border-default-200" }}
-          isClearable
-          onClear={() => setSearchQuery("")}
-        />
+        <div className="space-y-3">
+          <Input
+            placeholder="Search events..."
+            value={searchQuery}
+            onValueChange={setSearchQuery}
+            startContent={<Search size={15} className="text-default-400" />}
+            isClearable
+            onClear={() => setSearchQuery('')}
+            size="sm"
+            classNames={{ inputWrapper: 'bg-content1 border border-divider' }}
+          />
+          <div className="flex flex-wrap gap-2">
+            {STATUS_FILTERS.map((f) => (
+              <button
+                key={f}
+                onClick={() => setStatusFilter(f)}
+                className={cn(
+                  'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                  statusFilter === f
+                    ? 'bg-primary text-white'
+                    : 'bg-default-100 text-default-600 hover:bg-default-200',
+                )}
+              >
+                {f === 'All' ? 'All' : f.charAt(0) + f.slice(1).toLowerCase()}
+                {f !== 'All' && (
+                  <span className="ml-1.5 opacity-70">
+                    {events.filter((e) => e.status === f).length}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
-      {/* Events Table */}
-      <Card className="border border-default-200 shadow-sm">
-        <CardBody className="p-0">
-          {filteredEvents.length === 0 ? (
-            <div className="text-center py-16">
-              <Calendar className="w-12 h-12 text-default-300 mx-auto mb-4" />
-              <p className="text-default-500 mb-2">
-                {events.length === 0
-                  ? "You haven't created any events yet"
-                  : "No events match your search"}
-              </p>
-              {events.length === 0 && (
-                <Button
-                  color="primary"
-                  startContent={<Plus className="w-4 h-4" />}
-                  onPress={() => navigate("/dashboard/events/create")}
-                  className="mt-4"
-                >
-                  Create Your First Event
-                </Button>
-              )}
-            </div>
-          ) : (
-            <Table aria-label="Events table" removeWrapper>
-              <TableHeader>
-                <TableColumn>EVENT</TableColumn>
-                <TableColumn>DATE</TableColumn>
-                <TableColumn>LOCATION</TableColumn>
-                <TableColumn>CAPACITY</TableColumn>
-                <TableColumn>CATEGORIES</TableColumn>
-                <TableColumn>STATUS</TableColumn>
-                <TableColumn>ACTIONS</TableColumn>
-              </TableHeader>
-              <TableBody>
-                {filteredEvents.map((event) => {
-                  return (
-                    <TableRow key={event.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          {event.images?.[0]?.imageUrl ? (
-                            <img
-                              src={event.images[0].imageUrl}
-                              alt={event.name}
-                              className="w-12 h-12 rounded-lg object-cover"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 rounded-lg bg-default-100 flex items-center justify-center">
-                              <Calendar className="w-5 h-5 text-default-400" />
-                            </div>
-                          )}
-                          <div>
-                            <p className="font-medium">{event.name}</p>
-                            <p className="text-xs text-default-400 line-clamp-1 max-w-[200px]">
-                              {event.description}
-                            </p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <p>
-                            {new Date(event.startDate).toLocaleDateString(
-                              "en-US",
-                              {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              }
-                            )}
-                          </p>
-                          <p className="text-default-400 text-xs">
-                            {new Date(event.startDate).toLocaleTimeString(
-                              "en-US",
-                              { hour: "numeric", minute: "2-digit" }
-                            )}
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm">
-                          {event.location?.city}
-                          {event.location?.country
-                            ? `, ${event.location.country}`
-                            : ""}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Users className="w-3.5 h-3.5 text-default-400" />
-                          <span className="text-sm">{event.capacity}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1 flex-wrap">
-                          {event.categories?.slice(0, 2).map((cat) => (
-                            <Chip
-                              key={cat.id}
-                              size="sm"
-                              variant="flat"
-                              color="default"
-                            >
-                              {cat.name}
-                            </Chip>
-                          ))}
-                          {event.categories?.length > 2 && (
-                            <Chip size="sm" variant="flat">
-                              +{event.categories.length - 2}
-                            </Chip>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Dropdown>
-                          <DropdownTrigger>
-                            <Chip 
-                              size="sm" 
-                              color={getEventStatusStyle(event.status || 'DRAFT') as any} 
-                              variant="flat"
-                              className="cursor-pointer hover:opacity-80 transition-opacity"
-                            >
-                              {event.status || 'DRAFT'}
-                            </Chip>
-                          </DropdownTrigger>
-                          <DropdownMenu 
-                            aria-label="Event status actions"
-                            onAction={(key) => handleStatusChange(event.id, key as string)}
-                          >
-                            <DropdownItem key="PUBLISHED">Publish</DropdownItem>
-                            <DropdownItem key="DRAFT">Set as Draft</DropdownItem>
-                            <DropdownItem key="CANCELLED" className="text-danger" color="danger">Cancel Event</DropdownItem>
-                          </DropdownMenu>
-                        </Dropdown>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button
-                            as={Link}
-                            to={`/events/${event.id}`}
-                            isIconOnly
-                            size="sm"
-                            variant="light"
-                            title="View"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            as={Link}
-                            to={`/dashboard/event/${event.id}/analytics`}
-                            isIconOnly
-                            size="sm"
-                            variant="light"
-                            color="secondary"
-                            title="Analytics"
-                          >
-                            <BarChart2 className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            as={Link}
-                            to={`/dashboard/event/${event.id}`}
-                            isIconOnly
-                            size="sm"
-                            variant="light"
-                            title="Edit"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            isIconOnly
-                            isDisabled={deletingId === event.id}
-                            size="sm"
-                            variant="light"
-                            color="danger"
-                            onPress={() => {
-                              setDeletingId(event.id);
-                              setDeleteModal(true);
-                            }}
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+      {/* Event list */}
+      {filtered.length === 0 ? (
+        <div className="card-base p-12 text-center">
+          <div className="rounded-full bg-primary/10 p-4 mx-auto w-fit mb-4">
+            <Calendar size={28} className="text-primary" />
+          </div>
+          <p className="font-semibold text-sm mb-1">
+            {events.length === 0 ? "No events yet" : "No events match your filters"}
+          </p>
+          {events.length === 0 && (
+            <Button
+              color="primary"
+              size="sm"
+              startContent={<Plus size={14} />}
+              onPress={() => navigate('/dashboard/events/create')}
+              className="mt-3"
+            >
+              Create your first event
+            </Button>
           )}
-        </CardBody>
-      </Card>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((event) => (
+            <EventRow
+              key={event.id}
+              event={event}
+              onDeleteClick={(id) => { setDeletingId(id); setDeleteModal(true); }}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -141,26 +141,10 @@ export default function EventAnalyticsPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          title="Total Bookings"
-          value={analytics.totalBookings.toString()}
-          icon={<Users className="w-5 h-5 text-primary" />}
-        />
-        <MetricCard
-          title="Confirmed"
-          value={analytics.confirmedBookings.toString()}
-          icon={<Ticket className="w-5 h-5 text-primary" />}
-        />
-        <MetricCard
-          title="Available Spots"
-          value={analytics.availableSpots.toString()}
-          icon={<Calendar className="w-5 h-5 text-primary" />}
-        />
-        <MetricCard
-          title="Total Revenue"
-          value={`$${analytics.totalRevenue.toLocaleString()}`}
-          icon={<DollarSign className="w-5 h-5 text-primary" />}
-        />
+        <MetricCard title="Total Bookings"  value={analytics.totalBookings}              icon={Users}     color="primary"   />
+        <MetricCard title="Confirmed"       value={analytics.confirmedBookings}          icon={Ticket}    color="success"   />
+        <MetricCard title="Available Spots" value={analytics.availableSpots}             icon={Calendar}  color="secondary" />
+        <MetricCard title="Total Revenue"   value={`$${analytics.totalRevenue.toLocaleString()}`} icon={DollarSign} color="warning" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
